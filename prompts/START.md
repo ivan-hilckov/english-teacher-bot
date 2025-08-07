@@ -11,7 +11,7 @@ You are helping create English Teacher Bot based on the Hello AI Bot template (v
 - **Bot Username**: @english_teacher_bot (to be created via @BotFather)
 - **Description**: AI-powered English tutor that corrects grammar/spelling errors and translates text to English with detailed explanations
 - **Bot ID**: HB-003 (third bot in Hello Bot genealogy after hello-ai-bot v1.0.0)
-- **Port**: 8001 (avoiding hello-ai-bot port 8000)
+- **Port**: 8021 (avoiding hello-ai-bot port 8000)
 - **Database**: english_teacher_bot_db
 
 ### Core Functionality
@@ -62,14 +62,14 @@ uv sync
 #### 1.2 Configuration Updates
 - [ ] **Update `app/config.py`**:
   - `project_name: str = "English Teacher Bot"`
-  - `server_port: int = 8001`
+  - `server_port: int = 8021`
   - `database_url: str = "postgresql+asyncpg://english_teacher_bot_user:password@localhost:5432/english_teacher_bot_db"`
 
 - [ ] **Update `docker-compose.yml`**:
   - Container name: `english_teacher_bot_app`
-  - Port mapping: `"8001:8001"`
+  - Port mapping: `"8021:8021"`
   - Database name: `english_teacher_bot_db`
-  - Environment variable: `SERVER_PORT: 8001`
+  - Environment variable: `SERVER_PORT: 8021`
 
 - [ ] **Create new bot token**:
   - Message @BotFather → `/newbot` → @english_teacher_bot
@@ -78,7 +78,7 @@ uv sync
 - [ ] **Update `README.md`**:
   - Title: "English Teacher Bot"
   - Description: AI-powered English tutor
-  - Port information: 8001
+  - Port information: 8021
 
 ### Phase 2: Core English Teaching Features (2 hours)
 
@@ -232,9 +232,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://english_teacher_bot_user:${DB_PASSWORD}@postgres-shared:5432/english_teacher_bot_db
       BOT_TOKEN: ${ENGLISH_TEACHER_BOT_TOKEN}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      SERVER_PORT: 8001
+      SERVER_PORT: 8021
     ports:
-      - "8001:8001"
+      - "8021:8021"
     deploy:
       resources:
         limits:
@@ -252,7 +252,7 @@ Add to repository secrets:
 - Update deployment workflow to include english-teacher-bot
 
 #### 4.3 VPS Deployment
-- [ ] Deploy to VPS with port 8001 (avoiding hello-ai-bot port 8000)
+- [ ] Deploy to VPS with port 8021 (avoiding hello-ai-bot port 8000)
 - [ ] Configure shared PostgreSQL with english_teacher_bot_db database
 - [ ] Test production deployment with multiple bots running
 - [ ] Verify health checks and resource limits
@@ -276,7 +276,7 @@ git push origin main  # Automated deployment via GitHub Actions
 - [ ] **Repository Name**: Rename to "english-teacher-bot" 
 - [ ] **Bot Token**: Get new token from @BotFather for @english_teacher_bot
 - [ ] **Database Name**: Update to "english_teacher_bot_db" in environment variables
-- [ ] **Port Configuration**: Change SERVER_PORT to 8001 in all configs
+- [ ] **Port Configuration**: Change SERVER_PORT to 8021 in all configs
 - [ ] **README.md**: Update title, description, and features list
 - [ ] **docker-compose.yml**: Update container names and port mappings
 
@@ -296,7 +296,7 @@ git push origin main  # Automated deployment via GitHub Actions
 
 ### Deployment Configuration:
 - [ ] **GitHub Secrets**: Add ENGLISH_TEACHER_BOT_TOKEN
-- [ ] **VPS Setup**: Configure for port 8001 alongside existing bots
+- [ ] **VPS Setup**: Configure for port 8021 alongside existing bots
 - [ ] **Database Migration**: Setup english_teacher_bot_db
 - [ ] **Health Checks**: Verify bot functionality and resource limits
 
@@ -318,7 +318,7 @@ This is English Teacher Bot built from Hello AI Bot template (v1.0.0):
 
 Bot purpose: AI-powered English tutor that corrects grammar errors and translates text
 Core features: Error correction tables, translation, learning progress tracking
-Deployment: VPS port 8001 alongside hello-ai-bot (port 8000)
+Deployment: VPS port 8021 alongside hello-ai-bot (port 8000)
 ```
 
 ### Effective Prompts:
@@ -336,18 +336,18 @@ Deployment: VPS port 8001 alongside hello-ai-bot (port 8000)
 - Simple error handling with standard logging
 - One file per major component
 - Memory limit: 128MB per bot instance
-- Port 8001 for english-teacher-bot (avoiding conflicts)
+- Port 8021 for english-teacher-bot (avoiding conflicts)
 
 ## File Structure After Customization
 
 ```
 english-teacher-bot/
 ├── app/
-│   ├── config.py          # English teacher settings, port 8001, AI role prompt
+│   ├── config.py          # English teacher settings, port 8021, AI role prompt
 │   ├── database.py        # User + UserRole + Conversation + CorrectionHistory
 │   ├── handlers.py        # English correction and translation handlers
 │   ├── middleware.py      # Database middleware (unchanged from hello-ai-bot)
-│   ├── main.py           # Entry point with port 8001
+│   ├── main.py           # Entry point with port 8021
 │   └── services/
 │       ├── __init__.py   # Services package
 │       └── openai_service.py  # OpenAI integration (unchanged from hello-ai-bot)
@@ -355,7 +355,7 @@ english-teacher-bot/
 ├── tests/                # English correction and translation tests
 ├── docs/                 # English teaching methodology documentation
 ├── scripts/              # Deployment and development scripts
-├── docker-compose.yml    # Production deployment with port 8001
+├── docker-compose.yml    # Production deployment with port 8021
 ├── docker-compose.dev.yml # Development environment
 ├── pyproject.toml        # Project dependencies and configuration
 ├── .env.example          # Environment variables template
@@ -372,7 +372,7 @@ Add this to your new bot's README.md:
 - **Bot ID**: HB-003
 - **Created**: 2025
 - **Purpose**: AI-powered English tutor for grammar correction and translation
-- **Port**: 8001 (shared VPS deployment)
+- **Port**: 8021 (shared VPS deployment)
 - **GitHub**: https://github.com/your-username/english-teacher-bot
 ```
 
@@ -385,7 +385,7 @@ Your bot is ready when:
 - [ ] Start handler updated with English teaching welcome message
 - [ ] Error correction processing with table formatting works
 - [ ] Translation functionality from various languages works
-- [ ] Deploys successfully to VPS on port 8001 alongside hello-ai-bot (port 8000)
+- [ ] Deploys successfully to VPS on port 8021 alongside hello-ai-bot (port 8000)
 - [ ] Database english_teacher_bot_db created and accessible
 - [ ] All tests pass (`uv run pytest tests/ -v`)
 - [ ] Production health checks and resource limits verified
@@ -406,7 +406,7 @@ git push origin main           # Deploy via GitHub Actions
 # 2. Send "I are student" → verify grammar correction with error table
 # 3. Send "Привет, как дела?" → verify translation to English
 # 4. Check database for CorrectionHistory entries
-# 5. Verify port 8001 accessibility and health checks
+# 5. Verify port 8021 accessibility and health checks
 ```
 
 ## Quick Reference Commands
@@ -428,7 +428,7 @@ git push origin main
 
 # Monitoring
 docker logs english_teacher_bot_app
-curl http://localhost:8001/health  # Health check endpoint
+curl http://localhost:8021/health  # Health check endpoint
 ```
 
 Ready to build your English Teacher Bot! Follow the phases step-by-step and use AI collaboration for complex implementation details.

@@ -1,24 +1,25 @@
-# Hello AI Bot 🤖
+# English Teacher Bot 🎓
 
-**AI-powered Telegram bot with OpenAI integration for intelligent conversations.**
+**AI-powered English tutor bot for grammar correction and translation with detailed explanations.**
 
-A production-ready Telegram bot that combines the simplicity of Hello Bot template with the power of OpenAI GPT models. Chat with AI, customize roles, and maintain conversation history.
+A production-ready Telegram bot that combines the simplicity of Hello Bot template with the power of OpenAI GPT models. Get instant English grammar corrections, translations, and learning progress tracking.
 
 ## 🎯 Key Features
 
-- ✅ **AI-Powered Conversations**: Full OpenAI GPT integration with intelligent responses
+- ✅ **Grammar Correction**: Detailed error analysis with correction tables showing error types and explanations
+- ✅ **Translation Service**: Translate text from any language to natural English
+- ✅ **Learning Analytics**: Track your English improvement with error statistics and progress reports
 - ✅ **Production Ready**: Deploy to VPS with single `git push` via GitHub Actions
 - ✅ **Simple Architecture**: Clean, maintainable codebase optimized for AI collaboration
 - ✅ **Resource Efficient**: Shared PostgreSQL, optimized for 2GB VPS deployment
 - ✅ **Cost Management**: Built-in rate limiting and token usage tracking
-- ✅ **Exception Handling**: Production-grade error handling with proper exception chaining
 
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/your-username/hello-ai-bot
-cd hello-ai-bot
+git clone https://github.com/your-username/english-teacher-bot
+cd english-teacher-bot
 ```
 
 ### 2. Setup Development Environment
@@ -44,6 +45,7 @@ Add to `.env`:
 BOT_TOKEN=your_telegram_bot_token
 OPENAI_API_KEY=sk-your-openai-api-key-here
 DB_PASSWORD=secure_dev_password
+SERVER_PORT=8021
 ```
 
 ### 5. Start Development
@@ -55,74 +57,90 @@ docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml logs -f bot-dev
 ```
 
-### 6. Test Your AI Bot
-- Send `/start` to your bot → get personalized greeting
-- Send `/do Tell me a joke` → AI responds with a joke
-- Try `/do Write a Python function to reverse a string` → get code examples
+### 6. Test Your English Teacher Bot
+- Send `/start` to your bot → get English teacher welcome message
+- Send `I are student` → get detailed grammar correction with error table
+- Send `Привет, как дела?` → get English translation: "Hello, how are you?"
+- Try `/do Write me a text with errors` → get comprehensive correction analysis
 
-## 🤖 AI Commands & Features
+## 📚 English Teaching Features
 
 ### Available Commands
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/start` | Initialize user profile and get greeting | `/start` |
-| `/do <message>` | Send message to AI assistant | `/do Explain quantum physics simply` |
+| `/start` | Initialize user profile and get English teacher greeting | `/start` |
+| `/do <text>` | Process text for correction or translation | `/do I are student` |
 
-### AI Conversation Examples
+### Grammar Correction Examples
 
-**Code Generation:**
+**Error Correction with Table:**
 ```
-User: /do Write a Python function to calculate factorial
-Bot: Here's a Python function to calculate factorial:
+User: I are student and I live in Moscow
+Bot: 
+# Таблица исправления ошибок
 
-def factorial(n):
-    """Calculate factorial of a non-negative integer."""
-    if n < 0:
-        raise ValueError("Factorial is not defined for negative numbers")
-    if n == 0 or n == 1:
-        return 1
-    return n * factorial(n - 1)
+| Оригинал | Тип ошибки | Объяснение | Исправление |
+|----------|------------|------------|-------------|
+| I are | Грамматическая | Неправильная форма глагола be | I am |
+| I are student | Грамматическая | Отсутствует артикль | I am a student |
 
-# Example usage:
-print(factorial(5))  # Output: 120
+### Исправленный вариант:
+I am a student and I live in Moscow.
 ```
 
-**Explanations:**
+**Translation Examples:**
 ```
-User: /do What is machine learning?
-Bot: Machine learning is a subset of artificial intelligence (AI) where computers learn to make decisions or predictions by finding patterns in data, without being explicitly programmed for each specific task...
+User: Привет, как дела? Как работа?
+Bot: Hello, how are you? How is work?
+
+User: Je suis étudiant
+Bot: I am a student
+
+User: 我是学生
+Bot: I am a student
 ```
+
+### Learning Analytics
+- **Error Type Tracking**: Grammar, spelling, vocabulary, and style mistakes
+- **Progress Monitoring**: Track improvement over time
+- **Language Detection**: Automatic source language identification
+- **Correction History**: Complete log of all corrections and translations
 
 ## 🏗️ Architecture
 
 ### AI Processing Flow
 ```
-User Message → Telegram API → aiogram Router → AI Handler
+User Message → Telegram API → aiogram Router → English Teacher Handler
                                                     ↓
-Database Session ← User Role ← OpenAI Service ← Message Processing
-    ↓              ↓              ↓              ↓
-Conversation Log → Token Count → AI Response → User Response
+CorrectionHistory ← Error Analysis ← OpenAI Service ← Grammar/Translation Analysis
+    ↓              ↓                  ↓              ↓
+Learning Stats → Error Classification → AI Response → User Education
 ```
 
 ### Database Schema
 - **`users`**: User profiles and settings
-- **`user_roles`**: AI role preferences per user  
+- **`user_roles`**: English teacher AI role configuration
 - **`conversations`**: Complete chat history with token usage tracking
+- **`correction_history`**: Grammar corrections and translations with learning analytics
 
 ### Deployment Modes
-- **Development**: Polling mode with Docker Compose + hot reload
-- **Production**: Webhook mode (optional) or polling mode on VPS
+- **Development**: Polling mode with Docker Compose + hot reload (port 8021)
+- **Production**: Webhook mode (optional) or polling mode on VPS (port 8021)
 
 ## 🛠️ Technology Stack
 
-### AI & Core Framework
-- **[OpenAI](https://platform.openai.com/docs)** - GPT-3.5/GPT-4 models for intelligent responses
+### AI & English Teaching
+- **[OpenAI](https://platform.openai.com/docs)** - GPT-3.5/GPT-4 models for intelligent English tutoring
 - **[tiktoken](https://github.com/openai/tiktoken)** - Accurate token counting and cost estimation
+- **Custom Grammar Analysis** - Error type classification and language detection
+- **Learning Analytics** - Progress tracking and improvement insights
+
+### Core Framework
 - **[aiogram 3.0+](https://docs.aiogram.dev/)** - Modern async Telegram Bot framework
 - **[SQLAlchemy 2.0](https://docs.sqlalchemy.org/)** - Async PostgreSQL ORM with type safety
+- **[FastAPI](https://fastapi.tiangolo.com/)** - High-performance webhook server
 
 ### Infrastructure & Production
-- **[FastAPI](https://fastapi.tiangolo.com/)** - High-performance webhook server
 - **[PostgreSQL 15](https://www.postgresql.org/)** - Reliable, shared database
 - **[Docker + Compose](https://docs.docker.com/)** - Containerized deployment
 - **[GitHub Actions](https://docs.github.com/en/actions)** - Automated CI/CD pipeline
@@ -143,11 +161,16 @@ BOT_TOKEN=your_telegram_bot_token
 # OpenAI Integration  
 OPENAI_API_KEY=sk-your-openai-api-key-here
 DEFAULT_AI_MODEL=gpt-3.5-turbo
-DEFAULT_ROLE_PROMPT=You are a helpful AI assistant.
+
+# English Teacher Role
+DEFAULT_ROLE_PROMPT=You are an expert English tutor...
 
 # Database Configuration
 DB_PASSWORD=secure_password_123
 POSTGRES_ADMIN_PASSWORD=admin_password_456
+
+# Server Configuration
+SERVER_PORT=8021
 
 # Rate Limiting & Cost Control
 MAX_REQUESTS_PER_HOUR=60
@@ -159,7 +182,7 @@ MAX_TOKENS_PER_REQUEST=4000
 # Environment Settings
 ENVIRONMENT=development
 DEBUG=true
-PROJECT_NAME=hello-ai-bot
+PROJECT_NAME=english-teacher-bot
 
 # Production Webhook (optional - defaults to polling)
 WEBHOOK_URL=https://yourdomain.com/webhook
@@ -185,13 +208,13 @@ uv run ruff check .                  # Lint (no errors)
 uv run pytest tests/ -v              # Run tests
 
 # Database access
-docker compose -f docker-compose.dev.yml exec postgres psql -U postgres hello_ai_bot
+docker compose -f docker-compose.dev.yml exec postgres psql -U english_teacher_bot_user english_teacher_bot_db
 ```
 
 ### Local Development Workflow
 1. **Setup**: `uv sync` → `cp .env.example .env` → add bot token and OpenAI key
 2. **Start**: `docker compose -f docker-compose.dev.yml up -d`
-3. **Code**: Edit files → automatic reload → test AI responses immediately  
+3. **Code**: Edit files → automatic reload → test English teaching features immediately  
 4. **Quality**: Code passes ruff linting with proper exception chaining
 5. **Deploy**: `git push origin main` → automatic VPS deployment
 
@@ -199,8 +222,8 @@ docker compose -f docker-compose.dev.yml exec postgres psql -U postgres hello_ai
 
 ### Deployment Architecture
 - **Shared PostgreSQL**: Single database container for multiple bots
-- **Resource Optimization**: 150MB per bot, 512MB shared database
-- **Dual Mode Support**: Automatic polling mode (default) or webhook mode
+- **Resource Optimization**: 128MB per bot, 512MB shared database
+- **Port Configuration**: 8021 (avoiding conflicts with hello-ai-bot port 8000)
 - **GitHub Actions**: Automated deployment pipeline
 
 ### Required GitHub Secrets
@@ -219,7 +242,7 @@ Configure in your repository: **Settings → Secrets and variables → Actions**
 
 #### Application Secrets (Required)
 - `BOT_TOKEN` - Telegram bot token from @BotFather
-- `OPENAI_API_KEY` - OpenAI API key for AI functionality
+- `OPENAI_API_KEY` - OpenAI API key for English teaching functionality
 - `DB_PASSWORD` - Database password for bot user
 - `POSTGRES_ADMIN_PASSWORD` - PostgreSQL admin password for shared instance
 
@@ -233,13 +256,13 @@ Configure in your repository: **Settings → Secrets and variables → Actions**
 git push origin main
 
 # Manual verification
-./scripts/check_vps_simple.sh    # Check VPS status
+./scripts/check_vps_simple.sh    # Check VPS status on port 8021
 ```
 
 ## 📊 Performance & Resource Usage
 
 ### Memory Optimization
-- **Bot Application**: 150MB (includes AI processing)
+- **Bot Application**: 128MB (includes AI processing and grammar analysis)
 - **Shared PostgreSQL**: 512MB (supports multiple bots)
 - **Total VPS Footprint**: Optimized for 2GB RAM servers
 - **Connection Pooling**: Efficient database connections
@@ -249,37 +272,39 @@ git push origin main
 - **Token Limits**: 4000 tokens maximum per request
 - **Usage Tracking**: Detailed conversation and token logging
 - **Model Selection**: Cost-effective gpt-3.5-turbo by default
-- **Exception Handling**: Proper API error handling with cost control
+- **Smart Processing**: Efficient grammar analysis and error classification
 
 ### Performance Metrics
-- **AI Response Time**: <500ms for typical queries
+- **English Analysis Time**: <500ms for typical corrections
+- **Translation Speed**: <1 second for most languages
 - **Startup Time**: <30 seconds with shared infrastructure
-- **Concurrent Users**: 100+ active users supported on 2GB VPS
+- **Concurrent Users**: 100+ active learners supported on 2GB VPS
 - **Database Performance**: Async SQLAlchemy with connection pooling
 
 ## 📚 Documentation
 
 - **[Development Guide](docs/DEVELOPMENT.md)** - Local development and testing
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment to VPS  
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture and AI integration
-- **[Database Schema](docs/DATABASE.md)** - Data models and relationships
-- **[API Reference](docs/API.md)** - Bot commands and handlers
-- **[Technology Stack](docs/TECHNOLOGIES.md)** - Complete tech stack reference
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture and English teaching integration
+- **[Database Schema](docs/DATABASE.md)** - Data models and learning analytics
+- **[API Reference](docs/API.md)** - Bot commands and English teaching handlers
 
 ## 🤖 Bot Evolution History
 
-This AI bot evolved from the Hello Bot template with systematic enhancements:
+This English Teacher Bot evolved from the Hello AI Bot template with systematic English teaching enhancements:
 
 - **HB-001**: [Hello Bot Template](https://github.com/ivan-hilckov/hello-bot) - Simple greeting bot with database
-- **HB-002**: **Hello AI Bot v1.0.0** - Added OpenAI GPT integration, role system, conversation history, production-grade error handling
+- **HB-002**: [Hello AI Bot v1.0.0](https://github.com/ivan-hilckov/hello-ai-bot) - Added OpenAI GPT integration
+- **HB-003**: **English Teacher Bot v1.0.0** - Specialized English tutoring with grammar correction and translation
 
 ### Version 1.0.0 Features
-- ✅ **Stable Release**: Production-ready OpenAI integration
-- ✅ **Full AI Capabilities**: GPT-3.5/GPT-4 models with `/do` command  
-- ✅ **Role System**: Customizable AI personalities and contexts
-- ✅ **Conversation Management**: Complete chat history with token tracking
-- ✅ **Production Deployment**: One-command VPS deployment via GitHub Actions
-- ✅ **Shared Infrastructure**: Optimized PostgreSQL for multiple bots
+- ✅ **Grammar Correction**: Detailed error tables with correction explanations
+- ✅ **Translation Service**: Multi-language to English translation
+- ✅ **Learning Analytics**: CorrectionHistory model with progress tracking
+- ✅ **Error Classification**: Grammar, spelling, vocabulary, and style analysis
+- ✅ **Language Detection**: Automatic source language identification
+- ✅ **Production Deployment**: Optimized for port 8021 VPS deployment
+- ✅ **Shared Infrastructure**: Efficient PostgreSQL resource usage
 - ✅ **Cost Control**: Rate limiting and comprehensive usage tracking
 - ✅ **Enterprise Grade**: Exception handling, security, monitoring
 
@@ -290,16 +315,17 @@ This AI bot evolved from the Hello Bot template with systematic enhancements:
 - **Input Validation**: Pydantic models for configuration validation
 - **Resource Limits**: Memory and connection limits to prevent exhaustion
 - **Database Security**: Separate users and databases for each bot instance
+- **AI Safety**: Token limits and rate limiting to prevent API abuse
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with proper exception handling
+2. Create a feature branch (`git checkout -b feature/english-feature`)
+3. Make your changes with proper English teaching focus
 4. Ensure `uv run ruff check .` passes without errors
-5. Test AI functionality thoroughly
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
+5. Test English correction and translation functionality thoroughly
+6. Commit your changes (`git commit -m 'Add English teaching feature'`)
+7. Push to the branch (`git push origin feature/english-feature`)
 8. Open a Pull Request
 
 ## 📄 License
@@ -308,4 +334,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**🎉 STABLE v1.0.0 Released!** | **Production-ready AI bot with OpenAI integration**
+**🎉 STABLE v1.0.0 Released!** | **Production-ready English Teacher Bot with AI-powered grammar correction and translation**

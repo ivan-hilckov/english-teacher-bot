@@ -1,4 +1,4 @@
-# Simple development Docker image for Hello Bot
+# Simple development Docker image for English Teacher Bot
 FROM python:3.12-alpine
 
 # Install system dependencies

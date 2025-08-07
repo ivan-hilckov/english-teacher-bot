@@ -23,14 +23,14 @@ services:
 
       # Webhook configuration (optional)
       WEBHOOK_URL: ${WEBHOOK_URL:-}
-      SERVER_PORT: ${SERVER_PORT:-8000}
+      SERVER_PORT: ${SERVER_PORT:-8021}
 
       # Python optimizations
       PYTHONOPTIMIZE: "1"
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
     ports:
-      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
+      - "${SERVER_PORT:-8021}:${SERVER_PORT:-8021}"
 
     # Simple resource limits for bot
     deploy:

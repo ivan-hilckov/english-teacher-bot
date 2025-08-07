@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Required settings
     bot_token: str = Field(default="", description="Telegram Bot Token from BotFather")
     database_url: str = Field(
-        default="postgresql+asyncpg://hello_user:password@localhost:5432/hello_ai_bot",
+        default="postgresql+asyncpg://english_teacher_bot_user:password@localhost:5432/english_teacher_bot_db",
         description="Database connection URL",
     )
 
@@ -28,18 +28,31 @@ class Settings(BaseSettings):
     webhook_url: str | None = Field(default=None, description="Webhook URL for production")
 
     # Server port configuration
-    server_port: int = Field(default=8000, description="Server port for webhook mode")
+    server_port: int = Field(default=8021, description="Server port for webhook mode")
 
     # Project settings
     project_name: str = Field(
-        default="Hello AI Bot", description="Project name for greetings and display"
+        default="English Teacher Bot", description="Project name for greetings and display"
     )
 
     # OpenAI settings
     openai_api_key: str = Field(default="", description="OpenAI API key")
     default_ai_model: str = Field(default="gpt-3.5-turbo", description="Default AI model")
     default_role_prompt: str = Field(
-        default="You are a helpful AI assistant.", description="Default role prompt"
+        default="""You are an expert English tutor. Your job is to:
+
+1. CORRECTION MODE: If text is in English with errors, provide:
+   - Detailed error table: | Original | Error Type | Explanation | Correction |
+   - Complete corrected version
+   - Error types: Grammar, Spelling, Style, Vocabulary
+
+2. TRANSLATION MODE: If text is in another language:
+   - Detect language
+   - Translate to natural English
+   - Provide only the English translation
+
+Be precise, educational, and helpful.""",
+        description="English teacher role prompt",
     )
 
     # Rate limiting settings

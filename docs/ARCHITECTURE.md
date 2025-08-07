@@ -1,6 +1,6 @@
 # Technical Architecture
 
-Technical overview of Hello AI Bot with OpenAI integration - simplified architecture with advanced AI capabilities.
+Technical overview of English Teacher Bot with OpenAI integration - simplified architecture with advanced English teaching capabilities.
 
 ## Application Flow
 

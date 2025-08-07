@@ -1,7 +1,7 @@
 #!/bin/bash
 # Simplified development startup (35→15 lines reduction)
 
-echo "🚀 Starting Hello Bot development..."
+echo "🎓 Starting English Teacher Bot development..."
 
 # Check .env file exists
 [ ! -f .env ] && {
@@ -13,6 +13,7 @@ echo "🚀 Starting Hello Bot development..."
 # Start development with auto-reload via Docker volumes
 docker compose -f docker-compose.dev.yml up --build
 
-echo "✅ Development environment running!"
+echo "✅ English Teacher Bot development environment running!"
 echo "   Code changes will auto-restart the bot"
 echo "   Database: http://localhost:8080 (Adminer)"
+echo "   Port: 8021 (English Teacher Bot)"

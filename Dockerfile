@@ -1,4 +1,4 @@
-# Simple Dockerfile for Hello Bot
+# Simple Dockerfile for English Teacher Bot
 FROM python:3.12-alpine AS builder
 
 # Install build dependencies
@@ -51,9 +51,9 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD python -c "from app.config import settings; exit(0 if settings.bot_token else 1)"
 
 # Labels
-LABEL org.opencontainers.image.title="Hello Bot"
-LABEL org.opencontainers.image.description="Simple Telegram bot with PostgreSQL"
-LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.title="English Teacher Bot"
+LABEL org.opencontainers.image.description="AI-powered English tutor bot for grammar correction and translation"
+LABEL org.opencontainers.image.version="1.0.0"
 
 # Start the bot
 CMD ["python", "-m", "app.main"]

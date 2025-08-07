@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hello-ai-bot"
+name = "english-teacher-bot"
 version = "1.0.0"
-description = "AI-powered Telegram bot with OpenAI integration and role-based prompting system"
+description = "AI-powered English tutor bot for grammar correction and translation with detailed explanations"
 requires-python = ">=3.12"
 
 dependencies = [
