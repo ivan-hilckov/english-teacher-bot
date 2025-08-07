@@ -1,0 +1,223 @@
+name: Deploy Telegram Bot to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+
+jobs:
+  # Test and lint code
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run linter
+        run: uv run ruff check .
+
+      - name: Run formatter check
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+
+      - name: Validate Docker configuration
+        run: |
+          docker compose config
+          docker compose -f docker-compose.yml config
+
+  # Build and push Docker image
+  build-and-push:
+    name: Build & Push Image
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=cache
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Multi-layer caching strategy for optimal performance
+          cache-from: |
+            type=registry,ref=${{ env.IMAGE_NAME }}:cache
+            type=registry,ref=${{ env.IMAGE_NAME }}:latest
+            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
+            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+            type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # Enable additional optimizations
+          provenance: false
+          sbom: false
+
+  # Deploy to VPS
+  deploy:
+    name: Deploy to VPS
+    needs: [test, build-and-push]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ vars.APP_URL }}
+    concurrency:
+      group: deploy-${{ github.event.inputs.environment || 'production' }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare deployment files
+        run: |
+          # Create temporary directory for deployment
+          mkdir -p deploy
+
+          # Copy necessary files for production deployment
+          cp docker-compose.yml deploy/
+          cp docker-compose.postgres.yml deploy/
+          cp -r scripts deploy/
+          cp .env.example deploy/
+          chmod +x deploy/scripts/*.sh
+
+          echo "✅ Deployment files prepared"
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "deploy/*"
+          target: "/tmp/${{ github.event.repository.name }}-deploy"
+          strip_components: 1
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.1.0
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
+          BOT_IMAGE: ${{ env.IMAGE_NAME }}:latest
+          PROJECT_NAME: hello-ai-bot
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_SECRET_TOKEN: ${{ secrets.WEBHOOK_SECRET_TOKEN }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          envs: BOT_TOKEN,OPENAI_API_KEY,DB_PASSWORD,POSTGRES_ADMIN_PASSWORD,ENVIRONMENT,BOT_IMAGE,PROJECT_NAME,WEBHOOK_URL,WEBHOOK_SECRET_TOKEN,SERVER_PORT
+          script: |
+            # Set up deployment directory and permissions
+            cd /tmp/${{ github.event.repository.name }}-deploy
+            
+            # Ensure scripts are executable
+            chmod +x scripts/*.sh
+            
+            # Verify required files exist
+            echo "📁 Checking deployment files..."
+            ls -la scripts/ || echo "❌ scripts directory missing"
+            test -f scripts/manage_postgres.sh && echo "✅ manage_postgres.sh found" || echo "❌ manage_postgres.sh missing"
+            test -f scripts/deploy_simple.sh && echo "✅ deploy_simple.sh found" || echo "❌ deploy_simple.sh missing"
+            test -f docker-compose.postgres.yml && echo "✅ docker-compose.postgres.yml found" || echo "❌ docker-compose.postgres.yml missing"
+            
+            # Copy files to final deployment directory
+            echo "📂 Setting up final deployment directory..."
+            mkdir -p $HOME/${{ github.event.repository.name }}
+            cp -r * $HOME/${{ github.event.repository.name }}/
+            cd $HOME/${{ github.event.repository.name }}
+            
+            # Debug: Check if required variables are set
+            echo "🔍 Environment variables check:"
+            echo "BOT_TOKEN: ${BOT_TOKEN:0:10}..." 
+            echo "OPENAI_API_KEY: ${OPENAI_API_KEY:0:10}..."
+            echo "PROJECT_NAME: ${PROJECT_NAME}"
+            
+            # Run simplified production deployment script
+            echo "🚀 Starting deployment..."
+            ./scripts/deploy_simple.sh
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            # Final verification - check if bot responds to Telegram
+            echo "🔍 Final deployment verification..."
+            cd $HOME/${{ github.event.repository.name }}
+
+            if docker compose --profile production exec -T bot python -c "from app.config import settings; print('✅ Bot is healthy and ready')"; then
+              echo "✅ Deployment verification successful!"
+            else
+              echo "❌ Final verification failed"
+              exit 1
+            fi

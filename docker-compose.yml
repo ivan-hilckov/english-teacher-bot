@@ -1,0 +1,58 @@
+# Simple Production Docker Compose for Hello Bot
+# For development, use: docker compose -f docker-compose.dev.yml up
+
+services:
+
+
+  # Telegram Bot Application (Production)
+  bot:
+    image: ${BOT_IMAGE}
+    container_name: ${PROJECT_NAME}_app
+    env_file: .env
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql+asyncpg://${PROJECT_NAME}_user:${DB_PASSWORD}@postgres-shared:5432/${PROJECT_NAME}_db
+
+      # Bot configuration
+      BOT_TOKEN: ${BOT_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+      # Application settings
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+
+      # Webhook configuration (optional)
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      SERVER_PORT: ${SERVER_PORT:-8000}
+
+      # Python optimizations
+      PYTHONOPTIMIZE: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
+
+    # Simple resource limits for bot
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    restart: unless-stopped
+    networks:
+      - shared_network
+    # Simple health check
+    healthcheck:
+      test: [ "CMD", "python", "-c", "from app.config import settings; exit(0 if settings.bot_token else 1)" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    profiles:
+      - production
+
+networks:
+  shared_network:
+    name: vps_shared_network
+    external: true
