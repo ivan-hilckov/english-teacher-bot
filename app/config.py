@@ -2,12 +2,17 @@
 Simple application configuration.
 """
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+import os
+
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings."""
+
+    # Load from OS env and .env file
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Required settings
     bot_token: str = Field(default="", description="Telegram Bot Token from BotFather")
@@ -30,7 +35,11 @@ class Settings(BaseSettings):
     redis_session_ttl: int = Field(default=28800, description="Session TTL in seconds (8h)")
 
     # Admins (comma-separated IDs in env)
-    admin_ids: list[int] = Field(default_factory=list, description="Admin Telegram IDs")
+    admin_ids: list[int] = Field(
+        default_factory=list,
+        description="Admin Telegram IDs",
+        validation_alias=AliasChoices("ADMIN_IDS", "admin_ids"),
+    )
 
     # Optional webhook for production
     webhook_url: str | None = Field(default=None, description="Webhook URL for production")
@@ -41,8 +50,12 @@ class Settings(BaseSettings):
     @field_validator("admin_ids", mode="before")
     @classmethod
     def _parse_admin_ids(cls, value: object) -> list[int]:
-        if value is None or value == "":
-            return []
+        # Prefer explicit environment variable
+        raw = os.getenv("ADMIN_IDS", "")
+        if raw:
+            parts = [p.strip() for p in raw.split(",") if p.strip()]
+            return [int(p) for p in parts]
+        # Otherwise parse provided value
         if isinstance(value, list):
             return [int(v) for v in value]
         if isinstance(value, str):

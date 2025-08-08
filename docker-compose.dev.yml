@@ -50,6 +50,7 @@ services:
 
       # Bot configuration
       BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_IDS: ${ADMIN_IDS}
 
       # Application settings (development)
       ENVIRONMENT: development

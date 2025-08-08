@@ -44,7 +44,7 @@ def get_predefined_response(text: str) -> str | None:
             "• Grammar correction with error tables\n"
             "• Translation to English\n"
             "• Learning progress tracking\n\n"
-            "Just send text or use /do <text>"
+            "Just send text"
         )
 
     return None
@@ -132,37 +132,11 @@ async def start_handler(message: types.Message, session: AsyncSession) -> None:
         f"💎 1 request = 1 crystal\n\n"
         f"📋 <b>Usage:</b>\n"
         f"• Send any text for correction/translation\n"
-        f"• Use /do &lt;text&gt; to process explicitly\n"
         f"• /profile to see your balance\n"
     )
     kb = InlineKeyboardBuilder()
     kb.button(text="Buy 10 💎", callback_data="buy_10")
     await message.answer(greeting, parse_mode=ParseMode.HTML, reply_markup=kb.as_markup())
-
-
-@router.message(Command("do"))
-async def do_handler(message: types.Message, session: AsyncSession) -> None:
-    """Process text via /do command."""
-    if not message.text:
-        await message.reply("Usage: /do <your text>")
-        return
-
-    text = message.text.replace("/do ", "", 1).strip()
-    if not text:
-        await message.reply("Usage: /do <your text>")
-        return
-
-    # Charge 1 crystal before processing
-    user = await get_or_create_user(session, message.from_user)
-    ok = await debit(session, user, amount=1, reason="correction_debit")
-    if not ok:
-        await message.reply(
-            "❌ Not enough crystals. Please request a top-up from admin.",
-        )
-        return
-
-    await process_ai_message(message, session, text)
-    await message.answer(f"Done! Remaining balance: {user.balance} 💎")
 
 
 @router.message(F.text & ~F.text.startswith("/"))
@@ -195,6 +169,32 @@ async def profile_handler(message: types.Message, session: AsyncSession) -> None
     await message.answer(
         f"👤 Profile\n💎 Balance: <b>{user.balance}</b>", parse_mode=ParseMode.HTML
     )
+
+
+@router.message(Command("info"))
+async def info_handler(message: types.Message, session: AsyncSession) -> None:
+    """Show current user's Telegram ID and basic info for admin/top-up."""
+    if not message.from_user:
+        await message.reply("No user context")
+        return
+
+    user = await get_or_create_user(session, message.from_user)
+    is_admin = message.from_user.id in settings.admin_ids
+
+    print("message.from_user.id", message.from_user.id)
+    print("settings.admin_ids", settings.admin_ids)
+
+    username = (
+        f"@{message.from_user.username}" if getattr(message.from_user, "username", None) else "—"
+    )
+    text = (
+        "ℹ️ <b>Your Info</b>\n"
+        f"ID: <code>{message.from_user.id}</code>\n"
+        f"Username: {username}\n"
+        f"Admin: {'Yes' if is_admin else 'No'}\n"
+        f"Balance: <b>{user.balance}</b> 💎"
+    )
+    await message.answer(text, parse_mode=ParseMode.HTML)
 
 
 @router.message(Command("add"))
@@ -241,17 +241,44 @@ async def admin_add_handler(message: types.Message, session: AsyncSession) -> No
 
 @router.callback_query(F.data == "buy_10")
 async def buy_10_callback(callback: types.CallbackQuery, session: AsyncSession) -> None:
-    """MVP: instantly credit 10 crystals for demo purposes."""
+    """Request 10 crystals: notify admins to approve with /add <user_id> 10."""
     if not callback.from_user:
         await callback.answer("No user", show_alert=True)
         return
     user = await get_or_create_user(session, callback.from_user)
-    await credit(session, user, amount=10, reason="purchase_credit", description="Dev stub")
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(
-        f"💳 Purchased 10 💎. New balance: <b>{user.balance}</b>", parse_mode=ParseMode.HTML
+
+    # Notify admins
+    notified = 0
+    admin_text = (
+        "🔔 Crystal top-up request\n\n"
+        f"User ID: <code>{user.telegram_id}</code>\n"
+        f"Username: @{callback.from_user.username if callback.from_user.username else '—'}\n\n"
+        "Approve: <code>/add {uid} 10</code>".format(uid=user.telegram_id)
     )
-    await callback.answer("Credited 10 💎")
+    for admin_id in settings.admin_ids:
+        try:
+            await callback.bot.send_message(admin_id, admin_text, parse_mode=ParseMode.HTML)
+            notified += 1
+        except Exception:
+            logger.exception("Failed to notify admin %s", admin_id)
+
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    if notified == 0:
+        await callback.message.answer(
+            "❌ No admins configured. Please share your ID from /info to the admin manually.",
+        )
+        await callback.answer("No admins configured")
+        return
+
+    await callback.message.answer(
+        (
+            "📨 Request sent to admin(s). They will approve soon.\n"
+            f"Your ID: <code>{user.telegram_id}</code> (also available via /info)"
+        ),
+        parse_mode=ParseMode.HTML,
+    )
+    await callback.answer("Request sent")
 
 
 # --- English teaching helper functions for tests ---
