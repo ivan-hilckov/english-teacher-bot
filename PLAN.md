@@ -1,338 +1,347 @@
-# English Teacher Bot Transformation Plan
+# Redis Session + PostgreSQL User Architecture Plan
 
-Complete step-by-step plan to transform hello-ai-bot into english-teacher-bot following the specifications in `prompts/START.md`.
+## Strategic Architecture Overview
 
-## Overview
+### **Core Separation Strategy**
+Implement dual-layer data architecture optimized for payment system integration:
 
-**Source Bot**: hello-ai-bot (HB-002) v1.0.0
-**Target Bot**: english-teacher-bot (HB-003)
-**Purpose**: AI-powered English tutor for grammar correction and translation
-**Architecture**: Keep simplified hello-ai-bot structure (~320 lines)
+- **Redis**: Fast session state, conversation context, payment flows, temporary data
+- **PostgreSQL**: Persistent user profiles, transaction history, subscription data
+- **Clean Interface**: Repository pattern with clear data boundaries
 
-## Phase 1: Configuration and Project Setup
+### **Payment Integration Benefits**
+- **Session Isolation**: Payment flows don't affect user data integrity
+- **Fast State Management**: Redis handles rapid payment state transitions
+- **Atomic Operations**: PostgreSQL ensures payment transaction consistency  
+- **Scalability**: Independent scaling of session vs user data layers
 
-### 1.1 Project Identification Changes
+## Current Architecture Issues
 
-- [ ] **app/config.py**:
-  - Update `project_name` from "Hello AI Bot" to "English Teacher Bot"
-  - Update `server_port` from 8000 to 8021
-  - Update `database_url` to use "english_teacher_bot_db" and "english_teacher_bot_user"
-  - Update `default_role_prompt` to English teacher role
+### 1. **Mixed Concerns in Single Database**
+Current PostgreSQL stores both:
+- Persistent user data (should stay in PostgreSQL)
+- Temporary session state (should move to Redis)
 
-- [ ] **pyproject.toml**:
-  - Update `name` from "hello-ai-bot" to "english-teacher-bot"
-  - Update `description` to English teacher functionality
-  - Keep all dependencies (no changes needed)
+### 2. **Payment System Challenges**
+- No conversation state management for multi-step payment flows
+- User data mixed with transaction state creates complexity
+- Difficult to implement payment timeouts and cleanup
 
-- [ ] **.env.example**:
-  - Update `PROJECT_NAME` from "hello-ai-bot" to "english-teacher-bot"
-  - Update comments and descriptions for English teacher bot
-  - Add `SERVER_PORT=8021` example
+### 3. **Session Management Problems**
+- No persistent conversation context between messages
+- Limited ability to track user journey states
+- Poor separation for concurrent user interactions
 
-### 1.2 Docker Configuration Updates
+## Proposed Architecture
 
-- [ ] **docker-compose.yml**:
-  - Update container name from `${PROJECT_NAME}_app` to use "english_teacher_bot_app"
-  - Update port mapping from 8000 to 8021
-  - Update `SERVER_PORT` environment variable to 8021
-  - Keep memory limits (128M) and other settings
-
-- [ ] **docker-compose.dev.yml**:
-  - Update port mappings to 8021
-  - Update container names
-  - Update volume mounts and service names
-
-- [ ] **Dockerfile** and **Dockerfile.dev**:
-  - Update `EXPOSE` port from 8000 to 8021
-  - Keep all other settings unchanged
-
-## Phase 2: Database Model Enhancement
-
-### 2.1 Add CorrectionHistory Model
-
-- [ ] **app/database.py**:
-  - Add new `CorrectionHistory` model with fields:
-    - `id`: Primary key
-    - `user_id`: Foreign key to users table
-    - `original_text`: User's input text
-    - `corrected_text`: AI-corrected version
-    - `error_count`: Number of errors found
-    - `correction_type`: 'correction' or 'translation'
-    - `detected_language`: Source language (for translations)
-    - `created_at`, `updated_at`: Timestamps
-  - Add helper functions for English teaching operations
-
-### 2.2 Database Helper Functions
-
-- [ ] Add functions to **app/database.py**:
-  - `save_correction_history()`: Save correction/translation to database
-  - `get_user_progress()`: Get user's learning statistics
-  - `count_user_errors()`: Count errors by type for analytics
-
-## Phase 3: AI Service Customization
-
-### 3.1 English Teacher Role Prompt
-
-- [ ] **app/config.py** - Update `default_role_prompt`:
+### **Redis Session Layer**
 ```python
-default_role_prompt: str = Field(
-    default="""You are an expert English tutor. Your job is to:
-
-1. CORRECTION MODE: If text is in English with errors, provide:
-   - Detailed error table: | Original | Error Type | Explanation | Correction |
-   - Complete corrected version
-   - Error types: Grammar, Spelling, Style, Vocabulary
-
-2. TRANSLATION MODE: If text is in another language:
-   - Detect language
-   - Translate to natural English
-   - Provide only the English translation
-
-Be precise, educational, and helpful.""",
-    description="English teacher role prompt"
-)
+# Session data structure in Redis
+{
+    f"session:{telegram_id}": {
+        "conversation_state": "payment_amount_input",
+        "payment_flow": {
+            "product_id": "premium_subscription",
+            "amount": 999,
+            "currency": "RUB",
+            "step": "confirm_payment",
+            "expires_at": "2024-01-01T12:00:00Z"
+        },
+        "ai_context": {
+            "last_correction": "...",
+            "learning_topic": "grammar",
+            "message_count": 15
+        },
+        "temp_data": {},
+        "created_at": "2024-01-01T10:00:00Z",
+        "expires_at": "2024-01-01T18:00:00Z"  # 8 hour TTL
+    }
+}
 ```
 
-### 3.2 Response Processing Functions
+### **PostgreSQL User Layer**
+```python
+# Enhanced User model for payments
+class User(Base, TimestampMixin):
+    # Core user data (unchanged)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(255))
+    
+    # Payment-related persistent data
+    subscription_status: Mapped[str] = mapped_column(String(50), default="free")
+    subscription_expires_at: Mapped[datetime | None] = mapped_column()
+    total_paid: Mapped[int] = mapped_column(default=0)  # kopecks
+    
+    # Learning analytics
+    lessons_completed: Mapped[int] = mapped_column(default=0)
+    accuracy_score: Mapped[float] = mapped_column(default=0.0)
 
-- [ ] **app/handlers.py** - Add helper functions:
-  - `count_errors_in_response()`: Parse AI response to count errors
-  - `detect_correction_type()`: Determine if correction or translation
-  - `detect_language()`: Basic language detection
-  - `format_correction_table()`: Format markdown tables for Telegram
+class PaymentTransaction(Base, TimestampMixin):
+    """Persistent payment records"""
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    amount: Mapped[int] = mapped_column()  # kopecks
+    currency: Mapped[str] = mapped_column(String(3))
+    status: Mapped[str] = mapped_column(String(50))
+    provider_transaction_id: Mapped[str | None] = mapped_column(String(255))
+```
 
-## Phase 4: Handler Implementation
+## Implementation Plan
 
-### 4.1 Update Start Handler
+### **Phase 1: Redis Integration (Week 1)**
 
-- [ ] **app/handlers.py** - Update `start_handler()`:
-  - Change welcome message to English teacher introduction
-  - Explain correction and translation features
-  - Update command examples for English learning
-  - Remove hello-ai-bot specific references
+#### 1.1 Add Redis Dependencies
+```python
+# pyproject.toml additions
+redis = "^5.0.0"
+pydantic-redis = "^0.4.0"
+```
 
-### 4.2 Update AI Processing Handler
+#### 1.2 Redis Configuration
+```python
+# app/config.py
+class Settings(BaseSettings):
+    # Existing settings...
+    redis_url: str = Field(default="redis://localhost:6379/0")
+    session_ttl: int = Field(default=28800)  # 8 hours
+```
 
-- [ ] **app/handlers.py** - Update `process_ai_message()`:
-  - Add CorrectionHistory saving after AI response
-  - Implement error counting and classification
-  - Add language detection logic
-  - Format responses for educational purposes
+#### 1.3 Session Service Layer
+```python
+# app/services/session_service.py
+from redis.asyncio import Redis
+from typing import Any
 
-### 4.3 Update Command Handlers
+class SessionService:
+    def __init__(self, redis: Redis):
+        self.redis = redis
+        
+    async def get_session(self, telegram_id: int) -> dict[str, Any]:
+        """Get user session data"""
+        
+    async def set_session(self, telegram_id: int, data: dict) -> None:
+        """Set session data with TTL"""
+        
+    async def update_session(self, telegram_id: int, updates: dict) -> None:
+        """Partial session update"""
+        
+    async def clear_session(self, telegram_id: int) -> None:
+        """Clear user session"""
+```
 
-- [ ] **app/handlers.py** - Update predefined responses:
-  - Remove hello-ai-bot creator/repository references
-  - Add English teacher bot specific information
-  - Update GitHub repository links
-  - Add English learning tips and features
+### **Phase 2: Payment Flow Architecture (Week 2)**
 
-## Phase 5: Project Documentation Updates
+#### 2.1 Payment State Machine
+```python
+# app/services/payment_service.py
+from enum import Enum
 
-### 5.1 Main Documentation
+class PaymentState(Enum):
+    IDLE = "idle"
+    SELECTING_PRODUCT = "selecting_product"
+    CONFIRMING_AMOUNT = "confirming_amount"
+    PROCESSING_PAYMENT = "processing_payment"
+    PAYMENT_SUCCESS = "payment_success"
+    PAYMENT_FAILED = "payment_failed"
 
-- [ ] **README.md**:
-  - Update title to "English Teacher Bot 🎓"
-  - Update description to English tutoring features
-  - Update examples with grammar correction and translation
-  - Update GitHub repository URLs
-  - Update port references (8000 → 8021)
-  - Update bot genealogy section
+class PaymentFlow:
+    def __init__(self, session_service: SessionService):
+        self.session = session_service
+        
+    async def start_payment_flow(self, telegram_id: int, product_id: str):
+        """Initialize payment session"""
+        
+    async def handle_payment_step(self, telegram_id: int, user_input: str):
+        """Process payment flow steps"""
+```
 
-### 5.2 Technical Documentation
+#### 2.2 Enhanced Middleware
+```python
+# app/middleware.py
+class DataLayerMiddleware(BaseMiddleware):
+    """Inject both PostgreSQL session and Redis session"""
+    
+    async def __call__(self, handler, event, data):
+        # PostgreSQL session (existing)
+        async with AsyncSessionLocal() as pg_session:
+            # Redis session (new)
+            async with redis_pool.get_connection() as redis:
+                session_service = SessionService(redis)
+                
+                data["pg_session"] = pg_session
+                data["session_service"] = session_service
+                
+                try:
+                    result = await handler(event, data)
+                    await pg_session.commit()
+                    return result
+                except Exception:
+                    await pg_session.rollback()
+                    raise
+```
 
-- [ ] **docs/ARCHITECTURE.md**:
-  - Update for English teaching flow
-  - Add CorrectionHistory model documentation
-  - Update AI processing pipeline for education
+### **Phase 3: Repository Pattern Implementation (Week 3)**
 
-- [ ] **docs/DATABASE.md**:
-  - Add CorrectionHistory table schema
-  - Update relationship diagrams
-  - Add English learning analytics queries
+#### 3.1 User Repository (PostgreSQL)
+```python
+# app/repositories/user_repository.py
+class UserRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        
+    async def get_or_create_user(self, telegram_user) -> User:
+        """Handle persistent user data only"""
+        
+    async def update_subscription(self, user_id: int, status: str, expires_at: datetime):
+        """Update subscription data"""
+        
+    async def record_payment(self, user_id: int, amount: int, transaction_id: str):
+        """Record completed payment"""
+```
 
-- [ ] **docs/API.md**:
-  - Update command descriptions for English teaching
-  - Add correction and translation examples
-  - Update response format documentation
+#### 3.2 Session Repository (Redis)
+```python
+# app/repositories/session_repository.py
+class SessionRepository:
+    def __init__(self, session_service: SessionService):
+        self.session = session_service
+        
+    async def get_conversation_state(self, telegram_id: int) -> str:
+        """Get current conversation state"""
+        
+    async def set_payment_context(self, telegram_id: int, context: dict):
+        """Set payment flow context"""
+        
+    async def get_ai_context(self, telegram_id: int) -> dict:
+        """Get AI conversation context"""
+```
 
-- [ ] **docs/DEPLOYMENT.md**:
-  - Update port configuration (8021)
-  - Update environment variables
-  - Update GitHub secrets for English teacher bot
+### **Phase 4: Handler Refactoring (Week 4)**
 
-- [ ] **docs/DEVELOPMENT.md**:
-  - Update local development instructions
-  - Update testing commands for English features
-  - Update Docker commands with new ports
+#### 4.1 Payment Handlers
+```python
+# app/handlers/payment_handlers.py
+@router.message(Command("subscribe"))
+async def subscribe_handler(
+    message: types.Message, 
+    pg_session: AsyncSession,
+    session_service: SessionService
+):
+    user_repo = UserRepository(pg_session)
+    session_repo = SessionRepository(session_service)
+    
+    user = await user_repo.get_or_create_user(message.from_user)
+    await session_repo.set_conversation_state(user.telegram_id, "payment_product_selection")
+    
+    # Show payment options...
+```
 
-## Phase 6: Testing Updates
+#### 4.2 Enhanced AI Handlers
+```python
+# app/handlers/ai_handlers.py
+async def process_ai_message(
+    message: types.Message,
+    pg_session: AsyncSession, 
+    session_service: SessionService,
+    text: str
+):
+    session_repo = SessionRepository(session_service)
+    
+    # Get conversation context from Redis
+    ai_context = await session_repo.get_ai_context(message.from_user.id)
+    
+    # Process with context...
+    # Update context in Redis...
+```
 
-### 6.1 Test Configuration
+## Technology Integration
 
-- [ ] **tests/conftest.py**:
-  - Update test database configuration
-  - Add fixtures for CorrectionHistory model
-  - Update test settings for English teacher bot
+### **Docker Compose Updates**
+```yaml
+# docker-compose.yml additions
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+      
+volumes:
+  redis_data:
+```
 
-### 6.2 Handler Tests
+### **Configuration Management**
+```python
+# Environment variables
+REDIS_URL=redis://localhost:6379/0
+SESSION_TTL=28800  # 8 hours
+PAYMENT_SESSION_TTL=1800  # 30 minutes for payment flows
+```
 
-- [ ] **tests/test_handlers.py**:
-  - Update start handler tests for new welcome message
-  - Add tests for correction processing
-  - Add tests for translation functionality
-  - Add tests for CorrectionHistory saving
-  - Update mock AI responses for English teaching
+## Benefits for Payment Integration
 
-### 6.3 New Test Cases
+### **1. Isolated Payment Flows**
+- Payment state independent of user profile data
+- Easy to implement payment timeouts and cleanup
+- Concurrent payment flows don't interfere
 
-- [ ] Add new test files:
-  - Test error counting and classification
-  - Test language detection logic
-  - Test markdown table formatting
-  - Test correction history analytics
+### **2. Fast State Transitions**
+- Redis provides microsecond response times for state updates
+- Payment confirmation flows feel instant to users
+- Real-time payment status updates
 
-## Phase 7: Scripts and Deployment
+### **3. Data Integrity**
+- PostgreSQL ensures payment transaction ACID properties
+- Redis handles temporary state that can be safely lost
+- Clear separation prevents data corruption
 
-### 7.1 Development Scripts
+### **4. Scalability**
+- Redis sessions can be sharded by user ID
+- PostgreSQL optimized for complex payment queries
+- Independent scaling of each layer
 
-- [ ] **scripts/start_dev_simple.sh**:
-  - Update port references to 8021
-  - Update container names
-  - Keep all other functionality
+## Migration Strategy
 
-- [ ] **scripts/check_vps_simple.sh**:
-  - Update port checks to 8021
-  - Update container name checks
-  - Update health check URLs
+### **Week 1: Infrastructure Setup**
+- Add Redis to development environment
+- Create session service layer
+- Basic session CRUD operations
 
-### 7.2 Database Scripts
+### **Week 2: Session Integration** 
+- Update middleware to inject session service
+- Migrate conversation state to Redis
+- Test dual-layer data access
 
-- [ ] **scripts/init_db.sql**:
-  - Update database name to "english_teacher_bot_db"
-  - Update user name to "english_teacher_bot_user"
-  - Keep same permissions and structure
+### **Week 3: Payment Foundation**
+- Implement payment state machine
+- Create payment flow repositories
+- Add subscription management
 
-### 7.3 PostgreSQL Configuration
+### **Week 4: Handler Migration**
+- Refactor existing handlers
+- Implement payment handlers
+- Full integration testing
 
-- [ ] **scripts/postgresql.conf**:
-  - Keep existing optimizations
-  - No changes needed for English teacher bot
+## Success Metrics
 
-## Phase 8: Final Integration and Testing
+### **Performance**
+- Session operations < 10ms (Redis)
+- User queries < 100ms (PostgreSQL)
+- Payment flows < 500ms end-to-end
 
-### 8.1 Environment Configuration
+### **Reliability**
+- Zero session data loss during Redis restarts
+- Payment transaction integrity maintained
+- Graceful degradation when Redis unavailable
 
-- [ ] Create new **.env** file:
-  - Copy from .env.example
-  - Set PROJECT_NAME=english-teacher-bot
-  - Set SERVER_PORT=8021
-  - Add new BOT_TOKEN for @english_teacher_bot
-  - Keep same OPENAI_API_KEY
+### **Maintainability**
+- Clear separation between persistent and temporary data
+- Easy to add new payment providers
+- Simple testing of individual layers
 
-### 8.2 Local Testing
+---
 
-- [ ] **Functionality Tests**:
-  - Test `/start` command shows English teacher welcome
-  - Test grammar correction: "I are student" → proper correction table
-  - Test translation: "Привет, как дела?" → English translation
-  - Test CorrectionHistory database saves
-  - Test port 8021 accessibility
-
-### 8.3 Production Preparation
-
-- [ ] **GitHub Secrets**:
-  - Add `ENGLISH_TEACHER_BOT_TOKEN`
-  - Update deployment workflow if needed
-  - Verify VPS resource allocation for port 8021
-
-## Implementation Priority Order
-
-### Critical Changes (Must Complete):
-1. **Configuration** (`app/config.py`) - Project name, port, database, AI role
-2. **Database Model** (`app/database.py`) - Add CorrectionHistory model
-3. **Handlers** (`app/handlers.py`) - English teaching welcome and processing
-4. **Docker Config** (`docker-compose.yml`) - Port 8021 configuration
-5. **Project Info** (`pyproject.toml`, `README.md`) - Basic identification
-
-### Important Changes (Should Complete):
-6. **AI Integration** - Error counting, language detection, formatting
-7. **Tests** (`tests/`) - Update for English teaching functionality
-8. **Documentation** (`docs/`) - Update technical specifications
-9. **Scripts** (`scripts/`) - Update development and deployment tools
-
-### Optional Enhancements (If Time Permits):
-10. **Advanced Analytics** - User progress tracking, learning insights
-11. **Enhanced Formatting** - Better correction table display
-12. **Multiple Languages** - Improved language detection
-13. **Performance Optimization** - Response time improvements
-
-## Success Criteria
-
-The transformation is complete when:
-- [ ] Bot responds to `/start` with English teacher welcome message
-- [ ] Bot corrects English text with detailed error tables
-- [ ] Bot translates foreign text to English
-- [ ] CorrectionHistory model saves learning data to database
-- [ ] All configuration uses port 8021 and english_teacher_bot names
-- [ ] Local development works with `./scripts/start_dev_simple.sh`
-- [ ] All tests pass with `uv run pytest tests/ -v`
-- [ ] README.md accurately describes English Teacher Bot functionality
-
-## File-by-File Transformation Checklist
-
-### Core Application Files:
-- [ ] `app/config.py` - Project settings, port 8021, English teacher role
-- [ ] `app/database.py` - Add CorrectionHistory model + helper functions
-- [ ] `app/handlers.py` - English teaching handlers and AI processing
-- [ ] `app/main.py` - Port configuration (minimal changes)
-- [ ] `app/middleware.py` - No changes needed
-- [ ] `app/services/openai_service.py` - No changes needed
-
-### Project Configuration:
-- [ ] `pyproject.toml` - Project name and description
-- [ ] `.env.example` - Project name and port references
-- [ ] `README.md` - Complete rewrite for English Teacher Bot
-- [ ] `docker-compose.yml` - Port 8021 and container names
-- [ ] `docker-compose.dev.yml` - Development port configuration
-- [ ] `Dockerfile` - Expose port 8021
-- [ ] `Dockerfile.dev` - Development port configuration
-
-### Documentation:
-- [ ] `docs/ARCHITECTURE.md` - English teaching architecture
-- [ ] `docs/DATABASE.md` - CorrectionHistory schema
-- [ ] `docs/API.md` - English teaching commands
-- [ ] `docs/DEPLOYMENT.md` - Port 8021 deployment
-- [ ] `docs/DEVELOPMENT.md` - Updated development guide
-- [ ] `docs/GITHUB_SECRETS.md` - English teacher bot secrets
-- [ ] `docs/TECHNOLOGIES.md` - Updated tech stack info
-
-### Tests:
-- [ ] `tests/conftest.py` - Test configuration updates
-- [ ] `tests/test_handlers.py` - English teaching handler tests
-- [ ] `tests/test_webhook.py` - Port 8021 webhook tests
-
-### Scripts:
-- [ ] `scripts/start_dev_simple.sh` - Port 8021 development
-- [ ] `scripts/check_vps_simple.sh` - Port 8021 health checks
-- [ ] `scripts/deploy_simple.sh` - Updated deployment
-- [ ] `scripts/init_db.sql` - English teacher bot database
-- [ ] `scripts/manage_postgres.sh` - Database management
-- [ ] `scripts/postgresql.conf` - No changes needed
-- [ ] `scripts/README.md` - Updated script documentation
-
-## Estimated Timeline
-
-- **Phase 1-2 (Config + Database)**: 45 minutes
-- **Phase 3-4 (AI + Handlers)**: 60 minutes  
-- **Phase 5-6 (Docs + Tests)**: 45 minutes
-- **Phase 7-8 (Scripts + Testing)**: 30 minutes
-- **Total**: ~3 hours for complete transformation
-
-## Notes
-
-- Keep simplified architecture from hello-ai-bot (~320 lines total)
-- Maintain all existing hello-ai-bot optimizations and patterns
-- Focus on core English teaching functionality over advanced features
-- Ensure compatibility with shared PostgreSQL VPS deployment
-- Preserve all production-ready aspects of original template
+**Priority**: HIGH - Essential for payment system integration
+**Effort**: 4 weeks full implementation
+**Risk**: MEDIUM - Requires careful data migration and testing
