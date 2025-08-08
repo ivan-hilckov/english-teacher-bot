@@ -2,13 +2,13 @@
 
 **AI-powered English tutor bot for grammar correction and translation with detailed explanations.**
 
-A production-ready Telegram bot that combines the simplicity of Hello Bot template with the power of OpenAI GPT models. Get instant English grammar corrections, translations, and learning progress tracking.
+A ultra-simple Telegram bot focused purely on English grammar correction and translation. Stateless, fast, and optimized specifically for English teaching with zero configuration needed.
 
 ## 🎯 Key Features
 
 - ✅ **Grammar Correction**: Detailed error analysis with correction tables showing error types and explanations
 - ✅ **Translation Service**: Translate text from any language to natural English
-- ✅ **Learning Analytics**: Track your English improvement with error statistics and progress reports
+- ✅ **Stateless Design**: Each correction is independent - no history or settings to manage
 - ✅ **Production Ready**: Deploy to VPS with single `git push` via GitHub Actions
 - ✅ **Simple Architecture**: Clean, maintainable codebase optimized for AI collaboration
 - ✅ **Resource Efficient**: Shared PostgreSQL, optimized for 2GB VPS deployment
@@ -100,11 +100,11 @@ User: 我是学生
 Bot: I am a student
 ```
 
-### Learning Analytics
-- **Error Type Tracking**: Grammar, spelling, vocabulary, and style mistakes
-- **Progress Monitoring**: Track improvement over time
-- **Language Detection**: Automatic source language identification
-- **Correction History**: Complete log of all corrections and translations
+### Simplified Design
+- **Zero Configuration**: Works perfectly out-of-the-box with optimal settings
+- **Stateless Operation**: Each text correction is completely independent
+- **Instant Response**: No database queries for history or context
+- **Focus on Quality**: Optimized specifically for English teaching
 
 ## 🏗️ Architecture
 
@@ -112,16 +112,13 @@ Bot: I am a student
 ```
 User Message → Telegram API → aiogram Router → English Teacher Handler
                                                     ↓
-CorrectionHistory ← Error Analysis ← OpenAI Service ← Grammar/Translation Analysis
-    ↓              ↓                  ↓              ↓
-Learning Stats → Error Classification → AI Response → User Education
+                                              OpenAI Service
+                                                    ↓
+                                            AI Response → User
 ```
 
 ### Database Schema
-- **`users`**: User profiles and settings
-- **`user_roles`**: English teacher AI role configuration
-- **`conversations`**: Complete chat history with token usage tracking
-- **`correction_history`**: Grammar corrections and translations with learning analytics
+- **`users`**: Basic user profiles (minimal tracking for bot functionality)
 
 ### Deployment Modes
 - **Development**: Polling mode with Docker Compose + hot reload (port 8021)
@@ -291,22 +288,22 @@ git push origin main
 
 ## 🤖 Bot Evolution History
 
-This English Teacher Bot evolved from the Hello AI Bot template with systematic English teaching enhancements:
+This English Teacher Bot evolved from the Hello AI Bot template with radical simplification for pure English teaching:
 
 - **HB-001**: [Hello Bot Template](https://github.com/ivan-hilckov/hello-bot) - Simple greeting bot with database
 - **HB-002**: [Hello AI Bot v1.0.0](https://github.com/ivan-hilckov/hello-ai-bot) - Added OpenAI GPT integration
-- **HB-003**: **English Teacher Bot v1.0.0** - Specialized English tutoring with grammar correction and translation
+- **HB-003**: **English Teacher Bot v1.0.0** - Specialized English tutoring with comprehensive features
+- **HB-004**: **English Teacher Bot v1.1.0** - Ultra-simplified for pure English correction focus
 
-### Version 1.0.0 Features
-- ✅ **Grammar Correction**: Detailed error tables with correction explanations
-- ✅ **Translation Service**: Multi-language to English translation
-- ✅ **Learning Analytics**: CorrectionHistory model with progress tracking
-- ✅ **Error Classification**: Grammar, spelling, vocabulary, and style analysis
-- ✅ **Language Detection**: Automatic source language identification
-- ✅ **Production Deployment**: Optimized for port 8021 VPS deployment
-- ✅ **Shared Infrastructure**: Efficient PostgreSQL resource usage
-- ✅ **Cost Control**: Rate limiting and comprehensive usage tracking
-- ✅ **Enterprise Grade**: Exception handling, security, monitoring
+### Version 1.1.0 Features
+- ✅ **Pure Grammar Correction**: Focused solely on English teaching excellence
+- ✅ **Stateless Design**: Each correction independent for consistent quality
+- ✅ **Zero Configuration**: Optimal settings hardcoded for English teaching
+- ✅ **Ultra-Simple API**: Single method `generate_response(text)` 
+- ✅ **Minimal Database**: Only essential user tracking
+- ✅ **Production Ready**: Same reliable deployment infrastructure
+- ✅ **Cost Efficient**: Reduced complexity = lower resource usage
+- ✅ **Maintainable**: ~30% less code, easier to understand and modify
 
 ## 🔒 Security & Best Practices
 
@@ -334,4 +331,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**🎉 STABLE v1.0.0 Released!** | **Production-ready English Teacher Bot with AI-powered grammar correction and translation**
+**🎉 ULTRA-SIMPLE v1.1.0 Released!** | **Radically simplified English Teacher Bot focused purely on correction excellence**
