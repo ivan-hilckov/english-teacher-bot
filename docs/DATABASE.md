@@ -154,7 +154,6 @@ Optimized for shared PostgreSQL usage:
 # app/database.py - Optimized for shared instance
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
     future=True,
     pool_size=2,        # Reduced per bot (shared instance)
     max_overflow=3,     # Controlled overflow
@@ -314,7 +313,6 @@ Simple connection pool configuration:
 ```python
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,  # SQL logging in debug mode
     future=True,
     pool_size=3,          # Small pool for simple bot
     max_overflow=2,       # Limited overflow

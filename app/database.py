@@ -61,7 +61,6 @@ class User(Base, TimestampMixin):
 # Create engine and session with optimized pool for shared PostgreSQL
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
     future=True,
     pool_size=2,  # Reduced per bot (shared instance)
     max_overflow=3,  # Reduced overflow

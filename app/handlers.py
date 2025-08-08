@@ -10,7 +10,6 @@ from aiogram.filters import Command
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.database import User
 from app.services.openai_service import OpenAIService
 
@@ -48,7 +47,7 @@ def get_predefined_response(text: str) -> str | None:
 
 
 async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
-    """Get existing user or create new one."""
+    """Get existing user or create/update one from Telegram user data."""
     stmt = select(User).where(User.telegram_id == telegram_user.id)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
@@ -63,6 +62,14 @@ async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
         )
         session.add(user)
         await session.commit()
+    else:
+        # Update existing user with fresh data
+        user.username = telegram_user.username
+        user.first_name = telegram_user.first_name
+        user.last_name = telegram_user.last_name
+        user.language_code = telegram_user.language_code
+        user.is_active = True
+        await session.commit()
 
     return user
 
@@ -70,6 +77,7 @@ async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
 async def process_ai_message(message: types.Message, session: AsyncSession, text: str) -> None:
     """Process message through AI service."""
     if not message.from_user:
+        logger.warning("No user found in message")
         return
 
     # Check predefined responses
@@ -81,29 +89,39 @@ async def process_ai_message(message: types.Message, session: AsyncSession, text
     try:
         await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        await get_or_create_user(session, message.from_user)
+        user = await get_or_create_user(session, message.from_user)
 
+        await message.answer(f"Let me see... {user.display_name}")
         # AI request - simple and direct
         ai_response, tokens = await OpenAIService().generate_response(text)
+        logger.info(
+            "AI response generated | length=%d tokens=%d",
+            len(ai_response),
+            tokens,
+        )
 
-        await message.reply(ai_response, parse_mode=ParseMode.HTML)
+        await message.reply(ai_response, parse_mode=ParseMode.MARKDOWN)
 
-    except Exception as e:
-        await message.reply("❌ Error processing request. Please try again.")
-        logger.error(f"AI processing error: {e}")
+    except Exception:
+        logger.exception("AI processing error")
+
+        try:
+            await message.reply("❌ Error processing request. Please try again.")
+        except Exception:
+            logger.exception("Failed to send error message")
 
 
 @router.message(Command("start"))
 async def start_handler(message: types.Message, session: AsyncSession) -> None:
     """Handle /start command."""
     if not message.from_user:
-        await message.answer(f"Welcome to {settings.project_name}!")
+        await message.answer("Welcome to English Teacher Bot! Unknown")
         return
 
     user = await get_or_create_user(session, message.from_user)
 
     greeting = (
-        f"🎓 Welcome to <b>{settings.project_name}</b>, {user.display_name}!\n\n"
+        f"🎓 Welcome to <b>English Teacher Bot</b>, {user.display_name}!\n\n"
         f"📚 <b>Features:</b>\n"
         f"• Grammar correction with error tables\n"
         f"• Translation to English\n"
@@ -111,7 +129,6 @@ async def start_handler(message: types.Message, session: AsyncSession) -> None:
         f"📋 <b>Usage:</b>\n"
         f"• Send any text for correction/translation\n"
         f"• Use /do &lt;text&gt; for explicit processing\n\n"
-        f"🔗 Source: https://github.com/ivan-hilckov/english-teacher-bot"
     )
     await message.answer(greeting, parse_mode=ParseMode.HTML)
 
