@@ -3,14 +3,18 @@ Bot handlers - simplified.
 """
 
 import logging
+import re
 
 from aiogram import F, Router, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import User
+from app.services.balance_service import credit, debit, ensure_initial_bonus
 from app.services.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
@@ -119,18 +123,21 @@ async def start_handler(message: types.Message, session: AsyncSession) -> None:
         return
 
     user = await get_or_create_user(session, message.from_user)
+    # Ensure first-time bonus
+    await ensure_initial_bonus(session, user)
 
     greeting = (
         f"🎓 Welcome to <b>English Teacher Bot</b>, {user.display_name}!\n\n"
-        f"📚 <b>Features:</b>\n"
-        f"• Grammar correction with error tables\n"
-        f"• Translation to English\n"
-        f"• Learning progress tracking\n\n"
+        f"💎 Your balance: <b>{user.balance}</b>\n"
+        f"💎 1 request = 1 crystal\n\n"
         f"📋 <b>Usage:</b>\n"
         f"• Send any text for correction/translation\n"
-        f"• Use /do &lt;text&gt; for explicit processing\n\n"
+        f"• Use /do &lt;text&gt; to process explicitly\n"
+        f"• /profile to see your balance\n"
     )
-    await message.answer(greeting, parse_mode=ParseMode.HTML)
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Buy 10 💎", callback_data="buy_10")
+    await message.answer(greeting, parse_mode=ParseMode.HTML, reply_markup=kb.as_markup())
 
 
 @router.message(Command("do"))
@@ -145,11 +152,147 @@ async def do_handler(message: types.Message, session: AsyncSession) -> None:
         await message.reply("Usage: /do <your text>")
         return
 
+    # Charge 1 crystal before processing
+    user = await get_or_create_user(session, message.from_user)
+    ok = await debit(session, user, amount=1, reason="correction_debit")
+    if not ok:
+        await message.reply(
+            "❌ Not enough crystals. Please request a top-up from admin.",
+        )
+        return
+
     await process_ai_message(message, session, text)
+    await message.answer(f"Done! Remaining balance: {user.balance} 💎")
 
 
-@router.message(F.text)
+@router.message(F.text & ~F.text.startswith("/"))
 async def text_handler(message: types.Message, session: AsyncSession) -> None:
     """Handle all text messages."""
-    if message.text:
-        await process_ai_message(message, session, message.text)
+    if not message.text:
+        return
+
+    # Charge 1 crystal before processing (same as /do)
+    if not message.from_user:
+        return
+    user = await get_or_create_user(session, message.from_user)
+    ok = await debit(session, user, amount=1, reason="correction_debit")
+    if not ok:
+        await message.reply("❌ Not enough crystals. Use the Buy 10 💎 button in /start.")
+        return
+
+    await process_ai_message(message, session, message.text)
+    await message.answer(f"Done! Remaining balance: {user.balance} 💎")
+
+
+@router.message(Command("profile"))
+async def profile_handler(message: types.Message, session: AsyncSession) -> None:
+    """Show user balance."""
+    if not message.from_user:
+        await message.reply("No user context")
+        return
+
+    user = await get_or_create_user(session, message.from_user)
+    await message.answer(
+        f"👤 Profile\n💎 Balance: <b>{user.balance}</b>", parse_mode=ParseMode.HTML
+    )
+
+
+@router.message(Command("add"))
+async def admin_add_handler(message: types.Message, session: AsyncSession) -> None:
+    """Admin command: /add <telegram_id> [amount] credits balance."""
+    if not message.from_user or message.from_user.id not in settings.admin_ids:
+        await message.reply("❌ Admins only")
+        return
+
+    assert message.text is not None
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Usage: /add <telegram_id> [amount=10]")
+        return
+
+    try:
+        target_id = int(parts[1])
+        amount = int(parts[2]) if len(parts) > 2 else 10
+    except ValueError:
+        await message.reply("Invalid arguments. Usage: /add <telegram_id> [amount=10]")
+        return
+
+    # Find or create target user
+    class _TUser:
+        id: int
+        username: str | None
+        first_name: str | None
+        last_name: str | None
+        language_code: str | None
+
+        def __init__(self, id: int) -> None:  # noqa: A003 - align with Telegram schema
+            self.id = id
+            self.username = None
+            self.first_name = None
+            self.last_name = None
+            self.language_code = None
+
+    target_user = await get_or_create_user(session, _TUser(target_id))
+    await credit(session, target_user, amount=amount, reason="admin_credit")
+    await message.reply(
+        f"✅ Credited {amount} 💎 to {target_id}. New balance: {target_user.balance}",
+    )
+
+
+@router.callback_query(F.data == "buy_10")
+async def buy_10_callback(callback: types.CallbackQuery, session: AsyncSession) -> None:
+    """MVP: instantly credit 10 crystals for demo purposes."""
+    if not callback.from_user:
+        await callback.answer("No user", show_alert=True)
+        return
+    user = await get_or_create_user(session, callback.from_user)
+    await credit(session, user, amount=10, reason="purchase_credit", description="Dev stub")
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
+        f"💳 Purchased 10 💎. New balance: <b>{user.balance}</b>", parse_mode=ParseMode.HTML
+    )
+    await callback.answer("Credited 10 💎")
+
+
+# --- English teaching helper functions for tests ---
+
+
+def count_errors_in_response(response_text: str) -> dict[str, int]:
+    """Count error types in AI response by scanning markdown-like tables.
+
+    Very simple heuristic suitable for tests.
+    """
+    totals = {"total": 0, "grammar": 0, "spelling": 0, "vocabulary": 0, "style": 0}
+    for line in response_text.splitlines():
+        if "|" in line and not set(line.strip()) <= {"|", "-", " "}:
+            totals["total"] += 1
+            low = line.lower()
+            if "grammar" in low or "граммат" in low:
+                totals["grammar"] += 1
+            if "spelling" in low or "орфограф" in low:
+                totals["spelling"] += 1
+            if "vocabulary" in low or "лексик" in low:
+                totals["vocabulary"] += 1
+            if "style" in low or "стиль" in low:
+                totals["style"] += 1
+    return totals
+
+
+def detect_language(text: str) -> str:
+    """Very rough language detection for tests."""
+    if re.search(r"[\u0400-\u04FF]", text):  # Cyrillic
+        return "ru"
+    if re.search(r"[\u4e00-\u9fff]", text):  # CJK Unified
+        return "zh"
+    if re.search(r"[¿¡]", text):
+        return "es"
+    return "en"
+
+
+def detect_correction_type(original: str, response: str) -> str:
+    """Detect whether response is a correction or translation."""
+    orig_lang = detect_language(original)
+    resp_lang = detect_language(response)
+    if orig_lang != "en" and resp_lang == "en":
+        return "translation"
+    return "correction"

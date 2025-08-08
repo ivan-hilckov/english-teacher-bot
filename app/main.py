@@ -8,11 +8,12 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI
+from redis.asyncio import Redis
 
 from app.config import settings
 from app.database import create_tables
 from app.handlers import router
-from app.middleware import DatabaseMiddleware
+from app.middleware import DataLayerMiddleware
 
 
 def configure_logging():
@@ -31,7 +32,12 @@ async def main():
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
-    dp.message.middleware(DatabaseMiddleware())
+
+    # Redis client
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    data_layer_mw = DataLayerMiddleware(redis)
+    dp.message.middleware(data_layer_mw)
+    dp.callback_query.middleware(data_layer_mw)
     dp.include_router(router)
 
     if settings.webhook_url:
@@ -56,7 +62,10 @@ async def main():
         await server.serve()
     else:
         await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+        try:
+            await dp.start_polling(bot)
+        finally:
+            await redis.aclose()
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ Simple database module combining models, session, and engine.
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
-from sqlalchemy import BigInteger, String, func
+from sqlalchemy import JSON, BigInteger, ForeignKey, Integer, String, func, text
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -46,6 +46,9 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(default=True)
     language_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
+    # Balance of crystals
+    balance: Mapped[int] = mapped_column(Integer, default=100)
+
     @property
     def display_name(self) -> str:
         """Get the best display name for the user."""
@@ -59,6 +62,27 @@ class User(Base, TimestampMixin):
 
 
 # Create engine and session with optimized pool for shared PostgreSQL
+
+
+class Transaction(Base, TimestampMixin):
+    """Immutable balance transactions journal."""
+
+    __tablename__ = "transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    # Positive for credit, negative for debit; never zero
+    amount: Mapped[int] = mapped_column(Integer)
+
+    # Reason codes: welcome_bonus, admin_credit, purchase_credit, refund_credit, correction_debit
+    reason: Mapped[str] = mapped_column(String(50))
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
 engine = create_async_engine(
     settings.database_url,
     future=True,
@@ -91,7 +115,17 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def create_tables() -> None:
     """Create all tables."""
     async with engine.begin() as conn:
+        # Create missing tables
         await conn.run_sync(Base.metadata.create_all)
+
+        # Dev-friendly schema update: add balance column if it does not exist
+        try:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER DEFAULT 100")
+            )
+        except Exception:
+            # Ignore if dialect does not support IF NOT EXISTS
+            pass
 
 
 # Helper functions for AI functionality

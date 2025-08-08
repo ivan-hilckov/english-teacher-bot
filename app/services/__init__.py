@@ -1,3 +1,3 @@
 """
-Services package for Hello AI Bot.
+Services package.
 """

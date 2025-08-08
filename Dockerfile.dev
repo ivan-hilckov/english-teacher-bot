@@ -20,7 +20,8 @@ RUN pip install --no-cache-dir \
   uvicorn \
   watchdog \
   openai \
-  tiktoken
+  tiktoken \
+  redis>=5.0.0
 
 # Create app directory and set permissions
 RUN chown -R botuser:botuser /app

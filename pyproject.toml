@@ -31,6 +31,8 @@ dependencies = [
     # AI Integration
     "openai>=1.0.0",  # OpenAI API client
     "tiktoken>=0.5.1",  # Token counting for OpenAI models
+    # Redis for session storage
+    "redis>=5.0.0",
 ]
 
 [dependency-groups]
