@@ -50,10 +50,13 @@
             "type": "shell",
             "command": "docker",
             "args": [
+                "compose",
+                "-f",
+                "docker-compose.dev.yml",
                 "logs",
-                "hello_ai_bot_dev",
-                "--tail=50",
-                "-f"
+                "-f",
+                "--tail=100",
+                "bot-dev"
             ],
             "group": "build",
             "presentation": {
@@ -63,7 +66,52 @@
                 "panel": "dedicated"
             },
             "problemMatcher": [],
-            "detail": "Follow bot container logs (last 50 lines + live)"
+            "detail": "Follow bot service logs (last 100 lines + live)"
+        },
+        {
+            "label": "📋 View Postgres Logs",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "compose",
+                "-f",
+                "docker-compose.dev.yml",
+                "logs",
+                "-f",
+                "--tail=100",
+                "postgres"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Follow Postgres service logs (last 100 lines + live)"
+        },
+        {
+            "label": "📋 View All Dev Logs",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "compose",
+                "-f",
+                "docker-compose.dev.yml",
+                "logs",
+                "-f",
+                "--tail=100"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Follow all services logs (last 100 lines + live)"
         },
         {
             "label": "🔧 Format & Lint Code",

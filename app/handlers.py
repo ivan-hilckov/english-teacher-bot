@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import (
     Conversation,
     User,
+    get_conversation_history,
     get_or_create_user_role,
     save_correction_history,
 )
@@ -204,9 +205,38 @@ async def process_ai_message(message: types.Message, session: AsyncSession, text
         # Initialize OpenAI service
         openai_service = OpenAIService()
 
-        # Generate AI response
+        # Prepare short conversation context
+        recent = await get_conversation_history(
+            session=session, user_id=user.id, limit=settings.ai_context_messages
+        )
+        context_messages = []
+        for c in reversed(recent):  # old -> new
+            context_messages.append(
+                {"role": "user", "content": c.user_message, "tool_call_id": None}
+            )
+            context_messages.append(
+                {"role": "assistant", "content": c.ai_response, "tool_call_id": None}
+            )
+
+        # Generate AI response with tuning and agent mode
+        print(f"Generating response for {text}")
         ai_response, tokens = await openai_service.generate_response(
-            user_message=text, role_prompt=user_role.role_prompt, model=settings.default_ai_model
+            user_message=text,
+            role_prompt=user_role.role_prompt,
+            model=settings.default_ai_model,
+            context_messages=context_messages,
+            temperature=settings.ai_temperature,
+            top_p=settings.ai_top_p,
+            presence_penalty=settings.ai_presence_penalty,
+            frequency_penalty=settings.ai_frequency_penalty,
+            max_response_tokens=settings.ai_max_response_tokens,
+            agent_mode=settings.agent_mode_enabled,
+            meta_instructions=(
+                "Always decide: correction vs translation."
+                " If translation, output only natural English translation."
+                " If correction, include a Markdown table with columns: | Original | Error Type | Explanation | Correction |,"
+                " then provide the corrected sentence. Keep responses concise."
+            ),
         )
 
         # Analyze response for correction history
