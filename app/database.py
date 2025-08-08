@@ -93,31 +93,6 @@ class Conversation(Base, TimestampMixin):
     role_used: Mapped[str] = mapped_column(String(50))
 
 
-class CorrectionHistory(Base, TimestampMixin):
-    """Track user's English correction and translation history."""
-
-    __tablename__: str = "correction_history"
-
-    # Primary key
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    # Foreign key to user
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-
-    # Correction data
-    original_text: Mapped[str] = mapped_column(Text)
-    corrected_text: Mapped[str] = mapped_column(Text)
-    error_count: Mapped[int] = mapped_column(Integer, default=0)
-    correction_type: Mapped[str] = mapped_column(String(20))  # 'correction' or 'translation'
-    detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
-
-    # Learning analytics
-    errors_grammar: Mapped[int] = mapped_column(Integer, default=0)
-    errors_spelling: Mapped[int] = mapped_column(Integer, default=0)
-    errors_vocabulary: Mapped[int] = mapped_column(Integer, default=0)
-    errors_style: Mapped[int] = mapped_column(Integer, default=0)
-
-
 # Create engine and session with optimized pool for shared PostgreSQL
 engine = create_async_engine(
     settings.database_url,
@@ -186,62 +161,3 @@ async def get_conversation_history(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
-
-
-async def save_correction_history(
-    session: AsyncSession,
-    user_id: int,
-    original_text: str,
-    corrected_text: str,
-    correction_type: str,
-    error_count: int = 0,
-    detected_language: str | None = None,
-    errors_grammar: int = 0,
-    errors_spelling: int = 0,
-    errors_vocabulary: int = 0,
-    errors_style: int = 0,
-) -> CorrectionHistory:
-    """Save correction history for learning analytics."""
-    correction_history = CorrectionHistory(
-        user_id=user_id,
-        original_text=original_text,
-        corrected_text=corrected_text,
-        error_count=error_count,
-        correction_type=correction_type,
-        detected_language=detected_language,
-        errors_grammar=errors_grammar,
-        errors_spelling=errors_spelling,
-        errors_vocabulary=errors_vocabulary,
-        errors_style=errors_style,
-    )
-    session.add(correction_history)
-    await session.commit()
-    return correction_history
-
-
-async def get_user_progress(session: AsyncSession, user_id: int) -> dict[str, int]:
-    """Get user's learning progress statistics."""
-    stmt = select(CorrectionHistory).where(CorrectionHistory.user_id == user_id)
-    result = await session.execute(stmt)
-    corrections = list(result.scalars().all())
-
-    if not corrections:
-        return {
-            "total_corrections": 0,
-            "total_translations": 0,
-            "total_errors": 0,
-            "grammar_errors": 0,
-            "spelling_errors": 0,
-            "vocabulary_errors": 0,
-            "style_errors": 0,
-        }
-
-    return {
-        "total_corrections": len([c for c in corrections if c.correction_type == "correction"]),
-        "total_translations": len([c for c in corrections if c.correction_type == "translation"]),
-        "total_errors": sum(c.error_count for c in corrections),
-        "grammar_errors": sum(c.errors_grammar for c in corrections),
-        "spelling_errors": sum(c.errors_spelling for c in corrections),
-        "vocabulary_errors": sum(c.errors_vocabulary for c in corrections),
-        "style_errors": sum(c.errors_style for c in corrections),
-    }

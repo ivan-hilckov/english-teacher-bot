@@ -114,6 +114,51 @@
             "detail": "Follow all services logs (last 100 lines + live)"
         },
         {
+            "label": "📺 Live Bot Logs (since now)",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "compose",
+                "-f",
+                "docker-compose.dev.yml",
+                "logs",
+                "-f",
+                "--since=1s",
+                "bot-dev"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "problemMatcher": [],
+            "detail": "Stream only new bot logs starting now (no backlog)"
+        },
+        {
+            "label": "📺 Live All Logs (since now)",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "compose",
+                "-f",
+                "docker-compose.dev.yml",
+                "logs",
+                "-f",
+                "--since=1s"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Stream only new logs for all services starting now"
+        },
+        {
             "label": "🔧 Format & Lint Code",
             "type": "shell",
             "command": "uv",
