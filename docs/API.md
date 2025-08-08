@@ -1,19 +1,26 @@
 # Bot API Documentation
 
-Commands, handlers, and API interactions for Hello AI Bot with OpenAI integration.
+Commands, handlers, and API interactions for English Teacher Bot with crystal balance system.
 
 ## Bot Commands
 
 | Command  | Description               | Response                         | Database Action             |
 | -------- | ------------------------- | -------------------------------- | --------------------------- |
-| `/start` | Get personalized greeting | Enhanced greeting with bot info and commands | Creates/updates user record |
-| `/do <message>` | Direct AI interaction | AI-generated response based on user role | Saves conversation history |
-| _any text_ | AI conversation         | Intelligent AI response with context | Saves conversation to database |
-| _predefined queries_ | Creator/repository info | Pre-defined responses for common questions | None |
+| `/start` | Get welcome + balance info | Greeting with crystal balance and buy button | Creates user + 100 crystal bonus |
+| `/do <text>` | English correction request | Grammar/translation correction (costs 1 💎) | Debits 1 crystal, logs transaction |
+| `/profile` | Show balance | Current crystal balance and buy button | None |
+| `/add <telegram_id> [amount]` | Admin: add crystals | Confirmation with new balance | Credits crystals, logs transaction |
+| _any text_ | English correction         | Grammar/translation correction (costs 1 💎) | Debits 1 crystal, logs transaction |
 
 ## Enhanced Architecture
 
-All handlers with AI integration located in a single file: `app/handlers.py`
+English Teacher Bot with crystal balance system, Redis sessions, and transaction logging.
+
+### Core Services
+
+- **BalanceService**: Credit/debit operations with immutable transaction logging
+- **SessionService**: Redis-backed ephemeral session storage
+- **OpenAIService**: English correction and translation AI processing
 
 ### Handler Structure
 
@@ -22,23 +29,35 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.balance_service import credit, debit, ensure_initial_bonus
+from app.services.session_service import SessionService
 from app.services.openai_service import OpenAIService
 
 router = Router()
 
 @router.message(Command("start"))
 async def start_handler(message: types.Message, session: AsyncSession) -> None:
-    # Enhanced greeting with bot capabilities
+    # Welcome + grant 100 crystals to new users + show balance
     pass
 
 @router.message(Command("do"))
 async def do_ai_handler(message: types.Message, session: AsyncSession) -> None:
-    # Direct AI interaction via command
+    # English correction (costs 1 crystal)
+    pass
+
+@router.message(Command("profile"))
+async def profile_handler(message: types.Message, session: AsyncSession) -> None:
+    # Show crystal balance and buy button
+    pass
+
+@router.message(Command("add"))
+async def admin_add_handler(message: types.Message, session: AsyncSession) -> None:
+    # Admin: add crystals to user
     pass
 
 @router.message(F.text)
 async def default_handler(message: types.Message, session: AsyncSession) -> None:
-    # AI-powered response to any text message
+    # English correction for any text (costs 1 crystal)
     pass
 ```
 
@@ -47,6 +66,70 @@ async def default_handler(message: types.Message, session: AsyncSession) -> None
 ### `/start` Command
 
 **Handler**: `app/handlers.py:start_handler()`
+
+**Flow**:
+1. Get or create user
+2. Grant 100 crystals to new users (welcome bonus)
+3. Show greeting with current balance
+4. Display buy crystals button
+
+**Response Example**:
+```
+Привет! Я English Teacher Bot 🎓
+
+Я помогаю изучать английский язык:
+📝 Исправляю грамматические ошибки
+🌍 Перевожу с любого языка на английский  
+📚 Объясняю правила и даю примеры
+
+У тебя 100 💎 кристаллов
+💎 (один кристалл) = один запрос на коррекцию
+
+[Купить 10 💎]
+```
+
+### `/do <text>` Command
+
+**Handler**: `app/handlers.py:do_ai_handler()`
+
+**Flow**:
+1. Check if user has >= 1 crystal
+2. If insufficient: show "buy crystals" message
+3. If sufficient: debit 1 crystal and process AI correction
+4. Show correction result + remaining balance
+
+**Cost**: 1 💎 crystal per request
+
+### `/profile` Command
+
+**Handler**: `app/handlers.py:profile_handler()`
+
+**Response Example**:
+```
+👤 Профиль
+
+У тебя 47 💎 кристаллов
+💎 (один кристалл) = один запрос на коррекцию
+
+[Купить 10 💎]
+```
+
+### `/add <telegram_id> [amount]` Command (Admin Only)
+
+**Handler**: `app/handlers.py:admin_add_handler()`
+
+**Flow**:
+1. Check if sender is admin (telegram_id in ADMIN_IDS)
+2. Parse telegram_id and amount (default: 10)
+3. Find or create target user
+4. Credit crystals and log transaction
+5. Send confirmation
+
+**Response Example**:
+```
+✅ Добавлено 10 💎 кристаллов пользователю 123456789
+Новый баланс: 57 💎
+```
 
 **Purpose**:
 - Welcome new users with comprehensive bot information
