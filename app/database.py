@@ -5,7 +5,7 @@ Simple database module combining models, session, and engine.
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, String, Text, func, select
+from sqlalchemy import BigInteger, String, func
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -58,41 +58,6 @@ class User(Base, TimestampMixin):
         return " ".join(part for part in parts if part)
 
 
-class UserRole(Base, TimestampMixin):
-    """User's AI assistant role preference."""
-
-    __tablename__: str = "user_roles"
-
-    # Primary key
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    # Foreign key to user
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
-
-    # Role information
-    role_name: Mapped[str] = mapped_column(String(50), default="helpful_assistant")
-    role_prompt: Mapped[str] = mapped_column(Text, default="You are a helpful AI assistant.")
-
-
-class Conversation(Base, TimestampMixin):
-    """User conversation history."""
-
-    __tablename__: str = "conversations"
-
-    # Primary key
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    # Foreign key to user
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-
-    # Conversation data
-    user_message: Mapped[str] = mapped_column(Text)
-    ai_response: Mapped[str] = mapped_column(Text)
-    model_used: Mapped[str] = mapped_column(String(50))
-    tokens_used: Mapped[int] = mapped_column(Integer, default=0)
-    role_used: Mapped[str] = mapped_column(String(50))
-
-
 # Create engine and session with optimized pool for shared PostgreSQL
 engine = create_async_engine(
     settings.database_url,
@@ -131,33 +96,3 @@ async def create_tables() -> None:
 
 
 # Helper functions for AI functionality
-async def get_or_create_user_role(session: AsyncSession, user_id: int) -> UserRole:
-    """Get or create user role with default settings."""
-    stmt = select(UserRole).where(UserRole.user_id == user_id)
-    result = await session.execute(stmt)
-    user_role = result.scalar_one_or_none()
-
-    if not user_role:
-        user_role = UserRole(
-            user_id=user_id,
-            role_name="helpful_assistant",
-            role_prompt=settings.default_role_prompt,
-        )
-        session.add(user_role)
-        await session.commit()
-
-    return user_role
-
-
-async def get_conversation_history(
-    session: AsyncSession, user_id: int, limit: int = 5
-) -> list[Conversation]:
-    """Get recent conversation history for a user."""
-    stmt = (
-        select(Conversation)
-        .where(Conversation.user_id == user_id)
-        .order_by(Conversation.created_at.desc())
-        .limit(limit)
-    )
-    result = await session.execute(stmt)
-    return list(result.scalars().all())

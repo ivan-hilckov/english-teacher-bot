@@ -11,6 +11,29 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Hardcoded model parameters for English Teacher Bot
+MODEL = "gpt-3.5-turbo"
+TEMPERATURE = 0.3
+MAX_TOKENS = 1200
+TOP_P = 1.0
+PRESENCE_PENALTY = 0.0
+FREQUENCY_PENALTY = 0.0
+
+# English teacher system prompt
+SYSTEM_PROMPT = """You are an expert English tutor. Your job is to:
+
+1. CORRECTION MODE: If text is in English with errors, provide:
+   - Detailed error table: | Original | Error Type | Explanation | Correction |
+   - Complete corrected version
+   - Error types: Grammar, Spelling, Style, Vocabulary
+
+2. TRANSLATION MODE: If text is in another language:
+   - Detect language
+   - Translate to natural English
+   - Provide only the English translation
+
+Be precise, educational, and helpful. Decide: correction or translation. For corrections, use error table format."""
+
 
 class OpenAIService:
     """Simple OpenAI service for chat completions."""
@@ -21,59 +44,20 @@ class OpenAIService:
             raise ValueError("OpenAI API key is required")
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
 
-    async def generate_response(
-        self,
-        user_message: str,
-        role_prompt: str,
-        model: str | None = None,
-        *,
-        context_messages: list[dict[str, str]] | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        max_response_tokens: int | None = None,
-        agent_mode: bool | None = None,
-        meta_instructions: str | None = None,
-    ) -> tuple[str, int]:
-        """Generate AI response with context and tuning parameters."""
-        # Build message list
-        messages = [{"role": "system", "content": role_prompt}]
-
-        if meta_instructions:
-            messages.append({"role": "system", "content": meta_instructions})
-
-        if context_messages:
-            for msg in context_messages:
-                if msg["role"] in ("user", "assistant"):
-                    messages.append({"role": msg["role"], "content": msg["content"]})
-
-        messages.append({"role": "user", "content": user_message})
-
-        # Use provided params or defaults
-        model = model or settings.default_ai_model
-        temperature = temperature if temperature is not None else settings.ai_temperature
-        top_p = top_p if top_p is not None else settings.ai_top_p
-
-        presence_penalty = (
-            presence_penalty if presence_penalty is not None else settings.ai_presence_penalty
-        )
-
-        frequency_penalty = (
-            frequency_penalty if frequency_penalty is not None else settings.ai_frequency_penalty
-        )
-
-        max_tokens = max_response_tokens or settings.ai_max_response_tokens
-
+    async def generate_response(self, user_message: str) -> tuple[str, int]:
+        """Generate AI response for English correction/translation."""
         try:
             response = await self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                presence_penalty=presence_penalty,
-                frequency_penalty=frequency_penalty,
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+                max_tokens=MAX_TOKENS,
+                temperature=TEMPERATURE,
+                top_p=TOP_P,
+                presence_penalty=PRESENCE_PENALTY,
+                frequency_penalty=FREQUENCY_PENALTY,
                 timeout=30.0,
             )
 

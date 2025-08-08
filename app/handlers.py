@@ -11,12 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import (
-    Conversation,
-    User,
-    get_conversation_history,
-    get_or_create_user_role,
-)
+from app.database import User
 from app.services.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
@@ -86,42 +81,10 @@ async def process_ai_message(message: types.Message, session: AsyncSession, text
     try:
         await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        user = await get_or_create_user(session, message.from_user)
-        user_role = await get_or_create_user_role(session, user.id)
+        await get_or_create_user(session, message.from_user)
 
-        # Get conversation context
-        recent = await get_conversation_history(
-            session, user.id, limit=settings.ai_context_messages
-        )
-        context_messages = []
-        for c in reversed(recent):
-            context_messages.extend(
-                [
-                    {"role": "user", "content": c.user_message},
-                    {"role": "assistant", "content": c.ai_response},
-                ]
-            )
-
-        # AI request with debug params
-        ai_response, tokens = await OpenAIService().generate_response(
-            user_message=text,
-            role_prompt=user_role.role_prompt,
-            context_messages=context_messages,
-            temperature=0.3,
-            max_response_tokens=1200,
-            meta_instructions="Decide: correction or translation. For corrections, use error table format.",
-        )
-
-        conversation = Conversation(
-            user_id=user.id,
-            user_message=text,
-            ai_response=ai_response,
-            model_used=settings.default_ai_model,
-            tokens_used=tokens,
-            role_used=user_role.role_name,
-        )
-        session.add(conversation)
-        await session.commit()
+        # AI request - simple and direct
+        ai_response, tokens = await OpenAIService().generate_response(text)
 
         await message.reply(ai_response, parse_mode=ParseMode.HTML)
 
