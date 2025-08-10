@@ -28,30 +28,33 @@ def get_predefined_response(text: str) -> str | None:
     if any(word in lower for word in ["creator", "создатель", "автор", "кто тебя"]):
         return (
             "🧑‍💻 <b>Creator:</b> Ivan Hilkov (@ivan-hilckov)\n"
-            "🔗 GitHub: https://github.com/ivan-hilckov\n"
-            "📱 Telegram: @mrbzzz"
+            "GitHub: https://github.com/ivan-hilckov\n"
+            "Telegram: @mrbzzz"
         )
 
     if any(word in lower for word in ["repository", "github", "код", "source"]):
         return (
-            "📂 <b>Source:</b> https://github.com/ivan-hilckov/english-teacher-bot\n"
-            "🛠 Python 3.12+ • aiogram 3.0 • SQLAlchemy 2.0 • OpenAI API"
+            "<b>Source:</b> https://github.com/ivan-hilckov/english-teacher-bot\n"
+            "Python 3.12+ • aiogram 3.0 • SQLAlchemy 2.0 • OpenAI API"
         )
 
     if any(word in lower for word in ["help", "помощь", "commands", "что ты"]):
         return (
             "🎓 <b>English Teacher Bot</b>\n\n"
-            "• Grammar correction with error tables\n"
             "• Translation to English\n"
-            "• Learning progress tracking\n\n"
+            "• Grammar correction with error tables\n"
             "Just send text"
         )
 
     return None
 
 
-async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
-    """Get existing user or create/update one from Telegram user data."""
+async def get_or_create_user(session: AsyncSession, telegram_user) -> tuple[User, bool]:
+    """Get existing user or create/update one from Telegram user data.
+
+    Returns:
+        tuple[User, bool]: (user, is_new)
+    """
     stmt = select(User).where(User.telegram_id == telegram_user.id)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
@@ -66,6 +69,7 @@ async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
         )
         session.add(user)
         await session.commit()
+        return user, True
     else:
         # Update existing user with fresh data
         user.username = telegram_user.username
@@ -75,7 +79,7 @@ async def get_or_create_user(session: AsyncSession, telegram_user) -> User:
         user.is_active = True
         await session.commit()
 
-    return user
+    return user, False
 
 
 async def process_ai_message(message: types.Message, session: AsyncSession, text: str) -> None:
@@ -93,7 +97,7 @@ async def process_ai_message(message: types.Message, session: AsyncSession, text
     try:
         await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        user = await get_or_create_user(session, message.from_user)
+        user, _ = await get_or_create_user(session, message.from_user)
 
         await message.answer(f"Let me see... {user.display_name}")
         # AI request - simple and direct
@@ -110,7 +114,7 @@ async def process_ai_message(message: types.Message, session: AsyncSession, text
         logger.exception("AI processing error")
 
         try:
-            await message.reply("❌ Error processing request. Please try again.")
+            await message.reply("Error processing request. Please try again.")
         except Exception:
             logger.exception("Failed to send error message")
 
@@ -122,18 +126,38 @@ async def start_handler(message: types.Message, session: AsyncSession) -> None:
         await message.answer("Welcome to English Teacher Bot! Unknown")
         return
 
-    user = await get_or_create_user(session, message.from_user)
+    user, created = await get_or_create_user(session, message.from_user)
     # Ensure first-time bonus
     await ensure_initial_bonus(session, user)
 
-    greeting = (
-        f"🎓 Welcome to <b>English Teacher Bot</b>, {user.display_name}!\n\n"
-        f"💎 Your balance: <b>{user.balance}</b>\n"
-        f"💎 1 request = 1 crystal\n\n"
-        f"📋 <b>Usage:</b>\n"
-        f"• Send any text for correction/translation\n"
-        f"• /profile to see your balance\n"
-    )
+    # Notify admins about a brand new user
+    if created and settings.admin_ids:
+        username = (
+            f"@{message.from_user.username}"
+            if getattr(message.from_user, "username", None)
+            else "—"
+        )
+        admin_text = (
+            "New user joined\n\n"
+            f"New user joined: ID <code>{user.telegram_id}</code>\n"
+            f"Username: {username}\n\n"
+            "Suggest: <code>/gift {uid} 10</code>".format(uid=user.telegram_id)
+        )
+        for admin_id in settings.admin_ids:
+            try:
+                await message.bot.send_message(admin_id, admin_text, parse_mode=ParseMode.HTML)
+            except Exception:
+                logger.exception("Failed to notify admin %s about new user", admin_id)
+
+    greeting_text = """🎓 Welcome to <b>English Teacher Bot</b>, {user.display_name}!
+    💎 Your balance: <b>{user.balance}</b>
+    💎 1 request = 1 crystal
+    <b>Usage:</b>
+    • Send any text for correction/translation
+    • /profile to see your balance
+    """
+    greeting_text = greeting_text.format(user=user)
+    greeting = greeting_text.format(user=user)
     kb = InlineKeyboardBuilder()
     kb.button(text="Buy 10 💎", callback_data="buy_10")
     await message.answer(greeting, parse_mode=ParseMode.HTML, reply_markup=kb.as_markup())
@@ -148,7 +172,7 @@ async def text_handler(message: types.Message, session: AsyncSession) -> None:
     # Charge 1 crystal before processing (same as /do)
     if not message.from_user:
         return
-    user = await get_or_create_user(session, message.from_user)
+    user, _ = await get_or_create_user(session, message.from_user)
     ok = await debit(session, user, amount=1, reason="correction_debit")
     if not ok:
         await message.reply("❌ Not enough crystals. Use the Buy 10 💎 button in /start.")
@@ -165,7 +189,7 @@ async def profile_handler(message: types.Message, session: AsyncSession) -> None
         await message.reply("No user context")
         return
 
-    user = await get_or_create_user(session, message.from_user)
+    user, _ = await get_or_create_user(session, message.from_user)
     await message.answer(
         f"👤 Profile\n💎 Balance: <b>{user.balance}</b>", parse_mode=ParseMode.HTML
     )
@@ -178,7 +202,7 @@ async def info_handler(message: types.Message, session: AsyncSession) -> None:
         await message.reply("No user context")
         return
 
-    user = await get_or_create_user(session, message.from_user)
+    user, _ = await get_or_create_user(session, message.from_user)
     is_admin = message.from_user.id in settings.admin_ids
 
     print("message.from_user.id", message.from_user.id)
@@ -188,11 +212,10 @@ async def info_handler(message: types.Message, session: AsyncSession) -> None:
         f"@{message.from_user.username}" if getattr(message.from_user, "username", None) else "—"
     )
     text = (
-        "ℹ️ <b>Your Info</b>\n"
-        f"ID: <code>{message.from_user.id}</code>\n"
-        f"Username: {username}\n"
-        f"Admin: {'Yes' if is_admin else 'No'}\n"
-        f"Balance: <b>{user.balance}</b> 💎"
+        f"<b>Username:</b> {username}\n"
+        f"<b>ID:</b> <code>{message.from_user.id}</code>\n"
+        f"<b>Is admin:</b> {'Yes' if is_admin else 'No'}\n"
+        f"<b>Balance:</b> <b>{user.balance}</b> 💎"
     )
     await message.answer(text, parse_mode=ParseMode.HTML)
 
@@ -232,10 +255,78 @@ async def admin_add_handler(message: types.Message, session: AsyncSession) -> No
             self.last_name = None
             self.language_code = None
 
-    target_user = await get_or_create_user(session, _TUser(target_id))
+    target_user, _ = await get_or_create_user(session, _TUser(target_id))
     await credit(session, target_user, amount=amount, reason="admin_credit")
+    # Notify credited user
+    try:
+        await message.bot.send_message(
+            chat_id=target_id,
+            text=(
+                f"Your balance has been credited on {amount}. \n"
+                f"New balance: <b>{target_user.balance}</b> 💎"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception:
+        logger.exception("Failed to notify user %s about credit", target_id)
     await message.reply(
-        f"✅ Credited {amount} 💎 to {target_id}. New balance: {target_user.balance}",
+        f"Credited {amount} 💎 to {target_id}. New balance: {target_user.balance}",
+    )
+
+
+@router.message(Command("gift"))
+async def admin_gift_handler(message: types.Message, session: AsyncSession) -> None:
+    """Admin command: /gift <telegram_id> [amount] sends a gift to user and notifies them."""
+    if not message.from_user or message.from_user.id not in settings.admin_ids:
+        await message.reply("❌ Admins only")
+        return
+
+    assert message.text is not None
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Usage: /gift <telegram_id> [amount=10]")
+        return
+
+    try:
+        target_id = int(parts[1])
+        amount = int(parts[2]) if len(parts) > 2 else 10
+    except ValueError:
+        await message.reply("Invalid arguments. Usage: /gift <telegram_id> [amount=10]")
+        return
+
+    class _TUser:
+        id: int
+        username: str | None
+        first_name: str | None
+        last_name: str | None
+        language_code: str | None
+
+        def __init__(self, id: int) -> None:  # noqa: A003 - align with Telegram schema
+            self.id = id
+            self.username = None
+            self.first_name = None
+            self.last_name = None
+            self.language_code = None
+
+    target_user, _ = await get_or_create_user(session, _TUser(target_id))
+    await credit(session, target_user, amount=amount, reason="admin_gift", description="Gift")
+
+    # Notify gifted user
+    try:
+        await message.bot.send_message(
+            chat_id=target_id,
+            text=(
+                "🎁 You received a gift!\n"
+                f"Amount: <b>{amount}</b> 💎\n"
+                f"New balance: <b>{target_user.balance}</b> 💎"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception:
+        logger.exception("Failed to notify user %s about gift", target_id)
+
+    await message.reply(
+        f"🎁 Gifted {amount} 💎 to {target_id}. New balance: {target_user.balance}",
     )
 
 
@@ -245,7 +336,7 @@ async def buy_10_callback(callback: types.CallbackQuery, session: AsyncSession) 
     if not callback.from_user:
         await callback.answer("No user", show_alert=True)
         return
-    user = await get_or_create_user(session, callback.from_user)
+    user, _ = await get_or_create_user(session, callback.from_user)
 
     # Notify admins
     notified = 0

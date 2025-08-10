@@ -63,9 +63,6 @@
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.openRepositoryInParentFolders": "never",
-    "scm.showIncomingChanges": "never",
-    "scm.showOutgoingChanges": "never",
-    "scm.showHistoryGraph": false,
 
     // File associations
     "files.associations": {

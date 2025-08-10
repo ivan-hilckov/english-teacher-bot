@@ -40,5 +40,3 @@ class SessionService:
 
     async def clear_session(self, telegram_id: int) -> None:
         await self.redis.delete(self._key(telegram_id))
-
-

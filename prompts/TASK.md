@@ -1,36 +1,25 @@
-мы сделали очень много из наших планов тут:
+Описание проблемы:
 
-TRANSFORMATION_SUMMARY.md
-ROADMAP.md
-README.md
-PLAN.md
-PLAN_CLAUDE.md
-CLAUDE.md
-CHANGELOG.md
-prompts/_CURRENT_TASK.md
+сейчас нехватает оповещения админу о том что подключился новый пользователь.
 
-обновили много кода тут:
+можешь проанализировать код: 
 
-app/services/balance_service.py
-app/services/openai_service.py
-app/services/session_service.py
 app/config.py
 app/database.py
 app/handlers.py
 app/main.py
 app/middleware.py
+app/services/session_service.py
+app/services/openai_service.py
+app/services/balance_service.py
 
-и актуализируем документацию 
+Что надо сделать: 
 
-docs/API.md
-docs/ARCHITECTURE.md
-docs/DATABASE.md
-docs/DEPLOYMENT.md
-docs/DEVELOPMENT.md
-docs/GITHUB_SECRETS.md
-docs/TECHNOLOGIES.md
-README.md
+- оповещения админа о том что появился новый пользователь с предложением закинуть ему 10 кристалов и примером команды /gift [userid] [amount] 
+- в случае команды /gift от админа пользователю приходит сообщение что ему подарок [amount] кристалов
+- команду /gift может делать только админ
 
-при это удалим лишнее
-зафиксируем версию
-сделаем релиз на гитлабе
+Требования:
+
+- сделать максимально аккуратно и просто
+

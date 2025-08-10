@@ -5,8 +5,6 @@ Follows SQLAlchemy 2.0 async patterns and single-transaction usage provided by m
 
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,7 +37,7 @@ async def credit(
     user: User,
     amount: int,
     reason: str,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> None:
     """Credit user's balance by positive amount and record transaction."""
     if amount <= 0:
@@ -62,7 +60,7 @@ async def debit(
     user: User,
     amount: int,
     reason: str,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> bool:
     """Debit user's balance by positive amount and record transaction.
 
@@ -85,5 +83,3 @@ async def debit(
         )
     )
     return True
-
-
